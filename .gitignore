@@ -1,0 +1,98 @@
+# ===== Python (Backend, Windows Agent) =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# ===== Node.js / React (Eltern-Portal) =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ===== Flutter / Dart (Mobile App) =====
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+*.iml
+
+# ===== Android (Kotlin Agent) =====
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+local.properties
+.gradle/
+gradle/.gradle/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# ===== iOS / Swift (Phase 7) =====
+*.ipa
+*.dSYM.zip
+*.dSYM
+Pods/
+.symlinks/
+xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+
+# ===== IDEs =====
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# ===== Environment & Secrets =====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets.yaml
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ===== Docker =====
+docker-compose.override.yml
+
+# ===== Misc =====
+*.log
+*.tmp
+*.bak
+*.sqlite3
