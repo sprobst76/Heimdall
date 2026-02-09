@@ -311,3 +311,42 @@ export interface DayTypeOverrideCreate {
   day_type: string;
   label?: string | null;
 }
+
+// ── LLM / AI ────────────────────────────────────────────────────────────────
+
+export interface VerifyProofRequest {
+  quest_instance_id: string;
+}
+
+export interface VerifyProofResponse {
+  approved: boolean;
+  confidence: number;
+  feedback: string;
+  auto_approved: boolean;
+}
+
+export interface ParseRuleRequest {
+  text: string;
+  child_id?: string | null;
+}
+
+export interface ParseRuleResponse {
+  success: boolean;
+  rule?: Record<string, unknown> | null;
+  error?: string | null;
+}
+
+export interface WeeklyReportResponse {
+  child_id: string;
+  child_name: string;
+  report: string;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatResponse {
+  response: string;
+}

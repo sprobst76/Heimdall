@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     APP_NAME: str = "Heimdall API"
     API_V1_PREFIX: str = "/api/v1"
 
+    # LLM / Anthropic
+    ANTHROPIC_API_KEY: str = ""
+    LLM_AUTO_APPROVE_THRESHOLD: int = 80
+
     # Uploads
     UPLOAD_DIR: str = "uploads"
 

@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import 'quest_overview_screen.dart';
 import 'tan_screen.dart';
 import 'status_screen.dart';
+import 'chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,6 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
     QuestOverviewScreen(),
     TanScreen(),
     StatusScreen(),
+    ChatScreen(),
   ];
 
   @override
@@ -78,6 +80,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.timer_outlined),
             selectedIcon: Icon(Icons.timer),
             label: 'Status',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.chat_bubble_outline),
+            selectedIcon: Icon(Icons.chat_bubble),
+            label: 'Fragen',
           ),
         ],
       ),

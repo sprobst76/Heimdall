@@ -9,6 +9,7 @@ import AppGroupsPage from './pages/AppGroupsPage';
 import ChildrenPage from './pages/ChildrenPage';
 import QuestsPage from './pages/QuestsPage';
 import QuestReviewPage from './pages/QuestReviewPage';
+import AIAssistantPage from './pages/AIAssistantPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="app-groups/:childId" element={<AppGroupsPage />} />
             <Route path="quests/:childId" element={<QuestsPage />} />
             <Route path="quest-reviews" element={<QuestReviewPage />} />
+            <Route path="ai-assistant" element={<AIAssistantPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

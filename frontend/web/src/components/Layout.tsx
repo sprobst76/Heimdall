@@ -8,6 +8,7 @@ import {
   Grid3x3,
   Trophy,
   ClipboardCheck,
+  Brain,
   LogOut,
   Menu,
   X,
@@ -90,6 +91,11 @@ export default function Layout() {
           <NavLink to="/quest-reviews" className={navLinkClasses} onClick={() => setSidebarOpen(false)}>
             <ClipboardCheck className="h-4 w-4" />
             Quest-Prüfung
+          </NavLink>
+
+          <NavLink to="/ai-assistant" className={navLinkClasses} onClick={() => setSidebarOpen(false)}>
+            <Brain className="h-4 w-4" />
+            KI-Assistent
           </NavLink>
 
           {/* Children section */}

@@ -57,7 +57,12 @@ async def submit_proof(
     proof_type: str,
     proof_url: str,
 ) -> QuestInstance:
-    """Child submits proof for a claimed quest."""
+    """Child submits proof for a claimed quest.
+
+    If the quest template has ai_verify enabled and an API key is configured,
+    the proof is automatically verified. High-confidence results (>=80%) trigger
+    auto-approval with TAN generation.
+    """
     if instance.status != "claimed":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -68,6 +73,36 @@ async def submit_proof(
     instance.proof_type = proof_type
     instance.proof_url = proof_url
     await db.flush()
+
+    # Attempt AI verification if enabled
+    from app.config import settings
+
+    if settings.ANTHROPIC_API_KEY:
+        result = await db.execute(
+            select(QuestTemplate).where(QuestTemplate.id == instance.template_id)
+        )
+        template = result.scalar_one()
+
+        if template.ai_verify:
+            from app.services.llm_service import verify_quest_proof
+
+            ai_result = await verify_quest_proof(
+                image_path=proof_url,
+                quest_name=template.name,
+                quest_description=template.description,
+                ai_prompt=template.ai_prompt,
+            )
+            instance.ai_result = ai_result
+            await db.flush()
+
+            # Auto-approve if high confidence
+            threshold = settings.LLM_AUTO_APPROVE_THRESHOLD
+            if ai_result.get("approved") and ai_result.get("confidence", 0) >= threshold:
+                instance = await review_quest(
+                    db, instance, instance.child_id,
+                    approved=True, feedback=ai_result.get("feedback"),
+                )
+
     await db.refresh(instance)
     return instance
 

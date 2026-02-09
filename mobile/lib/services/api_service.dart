@@ -132,5 +132,14 @@ class ApiService {
     return response.data;
   }
 
+  // Chat (LLM)
+  Future<String> chat(String message, List<Map<String, String>> history) async {
+    final response = await _dio.post('/llm/chat', data: {
+      'message': message,
+      'history': history,
+    });
+    return response.data['response'] as String;
+  }
+
   Dio get dio => _dio;
 }
