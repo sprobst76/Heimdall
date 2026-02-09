@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     APP_NAME: str = "Heimdall API"
     API_V1_PREFIX: str = "/api/v1"
 
+    # Uploads
+    UPLOAD_DIR: str = "uploads"
+
     # Holiday API
     HOLIDAY_API_BASE_URL: str = "https://openholidaysapi.org"
     HOLIDAY_COUNTRY: str = "DE"

@@ -6,6 +6,8 @@ import {
   Shield,
   Ticket,
   Grid3x3,
+  Trophy,
+  ClipboardCheck,
   LogOut,
   Menu,
   X,
@@ -85,6 +87,11 @@ export default function Layout() {
             Kinder
           </NavLink>
 
+          <NavLink to="/quest-reviews" className={navLinkClasses} onClick={() => setSidebarOpen(false)}>
+            <ClipboardCheck className="h-4 w-4" />
+            Quest-Prüfung
+          </NavLink>
+
           {/* Children section */}
           {children && children.length > 0 && (
             <div className="mt-6">
@@ -135,6 +142,14 @@ export default function Layout() {
                       >
                         <Grid3x3 className="h-3.5 w-3.5" />
                         App-Gruppen
+                      </NavLink>
+                      <NavLink
+                        to={`/quests/${child.id}`}
+                        className={childNavClasses}
+                        onClick={() => setSidebarOpen(false)}
+                      >
+                        <Trophy className="h-3.5 w-3.5" />
+                        Quests
                       </NavLink>
                     </div>
                   </div>
