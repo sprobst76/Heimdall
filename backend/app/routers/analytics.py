@@ -56,7 +56,7 @@ async def child_dashboard(
 )
 async def child_report(
     child_id: uuid.UUID,
-    period: str = Query("week", regex="^(day|week|month)$"),
+    period: str = Query("week", pattern="^(day|week|month)$"),
     start_date: date | None = Query(None),
     end_date: date | None = Query(None),
     db: AsyncSession = Depends(get_db),
