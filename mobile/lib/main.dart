@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
+import 'services/agent_bridge.dart';
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize native agent bridge on Android
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    AgentBridge.initialize();
+  }
+
   runApp(const HeimdallChildApp());
 }
 

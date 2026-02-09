@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Heimdall Kind</string>
+    <string name="accessibility_service_description">Heimdall überwacht die App-Nutzung, um Bildschirmzeit-Regeln durchzusetzen.</string>
+    <string name="device_admin_description">Heimdall Kindersicherung — schützt vor unbefugter Deinstallation.</string>
+    <string name="monitor_notification_title">Heimdall aktiv</string>
+    <string name="monitor_notification_text">Bildschirmzeit wird überwacht</string>
+    <string name="monitor_channel_name">Heimdall Überwachung</string>
+    <string name="monitor_channel_description">Benachrichtigung für den Heimdall Überwachungsdienst</string>
+</resources>

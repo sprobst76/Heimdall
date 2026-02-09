@@ -20,11 +20,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "de.heimdall.heimdall_child"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 26  // Android 8.0+ for UsageStatsManager and notification channels
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -32,11 +29,22 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+}
+
+dependencies {
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    // OkHttp for WebSocket + HTTP
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // JSON
+    implementation("org.json:json:20240303")
+    // AndroidX Lifecycle
+    implementation("androidx.lifecycle:lifecycle-service:2.8.7")
+    // SharedPreferences (for offline rule cache)
+    implementation("androidx.preference:preference-ktx:1.2.1")
 }
 
 flutter {
