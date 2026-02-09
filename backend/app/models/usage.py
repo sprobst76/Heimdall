@@ -1,8 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, func, text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -16,19 +15,17 @@ class UsageEvent(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        server_default=text("gen_random_uuid()"),
+        Uuid, primary_key=True, default=uuid.uuid4,
     )
     device_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("devices.id"), nullable=False
+        Uuid, ForeignKey("devices.id"), nullable=False
     )
     child_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+        Uuid, ForeignKey("users.id"), nullable=False
     )
     app_package: Mapped[str | None] = mapped_column(String(255), nullable=True)
     app_group_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("app_groups.id"), nullable=True
+        Uuid, ForeignKey("app_groups.id"), nullable=True
     )
     event_type: Mapped[str] = mapped_column(
         String(20), nullable=False

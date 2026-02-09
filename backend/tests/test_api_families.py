@@ -1,10 +1,6 @@
 """Integration tests for the /api/v1/families endpoints."""
 
 import pytest
-from tests.conftest import requires_pg
-
-
-pytestmark = requires_pg
 
 
 class TestGetFamily:

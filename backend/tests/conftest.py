@@ -1,153 +1,126 @@
 """Shared fixtures for Heimdall backend tests.
 
-Integration tests require PostgreSQL. Set TEST_DATABASE_URL env var or
-use the default: postgresql+asyncpg://heimdall:heimdall@localhost:5432/heimdall_test
-
-If PostgreSQL is unreachable, integration tests are automatically skipped.
-Unit tests (test_unit_*.py) always run without a database.
+Uses SQLite (aiosqlite) by default — no PostgreSQL required.
+Set TEST_DATABASE_URL to override (e.g. for CI with real PostgreSQL).
 """
 
-import asyncio
 import os
 import uuid
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
+
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite+aiosqlite://")
+
+# Ensure settings can be loaded without .env
+os.environ.setdefault("SECRET_KEY", "test-secret-key-for-unit-tests")
+
+from app.database import Base  # noqa: E402
 
 # ---------------------------------------------------------------------------
-# PostgreSQL availability check
+# Engine — SQLite in-memory with StaticPool (shared across connections)
 # ---------------------------------------------------------------------------
-TEST_DATABASE_URL = os.environ.get(
-    "TEST_DATABASE_URL",
-    "postgresql+asyncpg://heimdall:heimdall@localhost:5432/heimdall_test",
+
+_engine_kwargs = {}
+if TEST_DATABASE_URL.startswith("sqlite"):
+    _engine_kwargs = {
+        "connect_args": {"check_same_thread": False},
+        "poolclass": StaticPool,
+    }
+
+_engine = create_async_engine(TEST_DATABASE_URL, echo=False, **_engine_kwargs)
+_TestSession = async_sessionmaker(
+    bind=_engine, class_=AsyncSession, expire_on_commit=False,
 )
 
-_pg_available: bool | None = None
-
-
-def pg_is_available() -> bool:
-    global _pg_available
-    if _pg_available is not None:
-        return _pg_available
-    try:
-        loop = asyncio.new_event_loop()
-
-        async def _probe():
-            engine = create_async_engine(TEST_DATABASE_URL, pool_pre_ping=True)
-            async with engine.connect() as conn:
-                await conn.execute(text("SELECT 1"))
-            await engine.dispose()
-
-        loop.run_until_complete(_probe())
-        loop.close()
-        _pg_available = True
-    except Exception:
-        _pg_available = False
-    return _pg_available
-
-
-requires_pg = pytest.mark.skipif(
-    not pg_is_available(),
-    reason="PostgreSQL not available — set TEST_DATABASE_URL",
-)
 
 # ---------------------------------------------------------------------------
-# DB engine + fixtures (only initialised when PG is reachable)
+# Session-scoped: create / drop tables
 # ---------------------------------------------------------------------------
 
-if pg_is_available():
-    from app.database import Base
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def _setup_tables():
+    import app.models  # noqa: F401 — populate Base.metadata
 
-    _engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-    _TestSession = async_sessionmaker(
-        bind=_engine, class_=AsyncSession, expire_on_commit=False,
-    )
+    async with _engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    async with _engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await _engine.dispose()
 
-    @pytest_asyncio.fixture(scope="session", autouse=True)
-    async def _setup_tables():
-        """Create all tables at session start, drop at session end."""
-        import app.models  # noqa: F401 — populate Base.metadata
 
-        async with _engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-            await conn.run_sync(Base.metadata.create_all)
-        yield
-        async with _engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-        await _engine.dispose()
+# ---------------------------------------------------------------------------
+# Per-test session with rollback
+# ---------------------------------------------------------------------------
 
-    @pytest_asyncio.fixture()
-    async def db_session():
-        """Async session that rolls back after each test."""
-        async with _TestSession() as session:
-            yield session
-            await session.rollback()
+@pytest_asyncio.fixture()
+async def db_session():
+    async with _TestSession() as session:
+        yield session
+        await session.rollback()
 
-    @pytest_asyncio.fixture()
-    async def client(db_session: AsyncSession):
-        """httpx AsyncClient wired to the FastAPI app with test DB session."""
-        from app.database import get_db
-        from app.main import app
 
-        async def _override_get_db():
-            yield db_session
+# ---------------------------------------------------------------------------
+# HTTP test client
+# ---------------------------------------------------------------------------
 
-        app.dependency_overrides[get_db] = _override_get_db
+@pytest_asyncio.fixture()
+async def client(db_session: AsyncSession):
+    from app.database import get_db
+    from app.main import app
 
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as ac:
-            yield ac
+    async def _override_get_db():
+        yield db_session
 
-        app.dependency_overrides.clear()
+    app.dependency_overrides[get_db] = _override_get_db
 
-    @pytest_asyncio.fixture()
-    async def registered_parent(client: AsyncClient, db_session: AsyncSession):
-        """Register a parent user and return context dict.
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
 
-        Returns dict with keys:
-            headers, user_id, family_id, email, tokens
-        """
-        from app.core.security import decode_token
-        from app.models.user import User
+    app.dependency_overrides.clear()
 
-        email = f"parent-{uuid.uuid4().hex[:8]}@test.de"
-        resp = await client.post("/api/v1/auth/register", json={
-            "email": email,
-            "password": "testpassword123",
-            "name": "Test Eltern",
-            "family_name": "Test Familie",
-        })
-        assert resp.status_code == 200, resp.text
-        tokens = resp.json()
-        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
 
-        payload = decode_token(tokens["access_token"])
-        user_id = uuid.UUID(payload["sub"])
+# ---------------------------------------------------------------------------
+# Convenience: registered parent with tokens + family_id
+# ---------------------------------------------------------------------------
 
-        result = await db_session.execute(select(User).where(User.id == user_id))
-        user = result.scalar_one()
+@pytest_asyncio.fixture()
+async def registered_parent(client: AsyncClient, db_session: AsyncSession):
+    """Register a parent and return context dict.
 
-        return {
-            "headers": headers,
-            "user_id": str(user.id),
-            "family_id": str(user.family_id),
-            "email": email,
-            "tokens": tokens,
-        }
+    Keys: headers, user_id, family_id, email, tokens
+    """
+    from app.core.security import decode_token
+    from app.models.user import User
 
-else:
-    # Stub fixtures so test collection doesn't fail when PG is absent
-    @pytest.fixture()
-    def db_session():
-        pytest.skip("PostgreSQL not available")
+    email = f"parent-{uuid.uuid4().hex[:8]}@test.de"
+    resp = await client.post("/api/v1/auth/register", json={
+        "email": email,
+        "password": "testpassword123",
+        "name": "Test Eltern",
+        "family_name": "Test Familie",
+    })
+    assert resp.status_code == 200, resp.text
+    tokens = resp.json()
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
 
-    @pytest.fixture()
-    def client():
-        pytest.skip("PostgreSQL not available")
+    payload = decode_token(tokens["access_token"])
+    user_id = uuid.UUID(payload["sub"])
 
-    @pytest.fixture()
-    def registered_parent():
-        pytest.skip("PostgreSQL not available")
+    result = await db_session.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one()
+
+    return {
+        "headers": headers,
+        "user_id": str(user.id),
+        "family_id": str(user.family_id),
+        "email": email,
+        "tokens": tokens,
+    }

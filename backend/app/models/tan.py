@@ -1,33 +1,31 @@
 import uuid
 from datetime import datetime, time
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Time, func, text
-from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Time, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.types import UUIDArray
 
 
 class TAN(Base):
     __tablename__ = "tans"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        server_default=text("gen_random_uuid()"),
+        Uuid, primary_key=True, default=uuid.uuid4,
     )
     child_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+        Uuid, ForeignKey("users.id"), nullable=False
     )
     code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
     type: Mapped[str] = mapped_column(
         String(30), nullable=False
     )  # 'time', 'group_unlock', 'extend_window', 'override'
     scope_groups: Mapped[list[uuid.UUID] | None] = mapped_column(
-        ARRAY(UUID(as_uuid=True)), nullable=True
+        UUIDArray(), nullable=True
     )
     scope_devices: Mapped[list[uuid.UUID] | None] = mapped_column(
-        ARRAY(UUID(as_uuid=True)), nullable=True
+        UUIDArray(), nullable=True
     )
     value_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     value_unlock_until: Mapped[time | None] = mapped_column(Time, nullable=True)
@@ -39,7 +37,7 @@ class TAN(Base):
         String(20), nullable=False
     )  # 'quest', 'parent_manual', 'scheduled'
     source_quest_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
+        Uuid, nullable=True
     )
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="active"

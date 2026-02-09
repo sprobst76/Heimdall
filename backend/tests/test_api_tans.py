@@ -4,10 +4,6 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from tests.conftest import requires_pg
-
-
-pytestmark = requires_pg
 
 
 async def _create_child(client, parent) -> str:

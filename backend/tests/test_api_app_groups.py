@@ -3,10 +3,6 @@
 import uuid
 
 import pytest
-from tests.conftest import requires_pg
-
-
-pytestmark = requires_pg
 
 
 async def _create_child(client, parent) -> str:
@@ -143,10 +139,14 @@ class TestAppGroupApps:
                 json={"app_name": app_name, "app_package": pkg, "platform": "android"},
             )
 
+        # Apps are returned as part of the group response
         resp = await client.get(
-            f"/api/v1/children/{child_id}/app-groups/{group_id}/apps",
+            f"/api/v1/children/{child_id}/app-groups/{group_id}",
             headers=p["headers"],
         )
         assert resp.status_code == 200
-        apps = resp.json()
+        apps = resp.json()["apps"]
         assert len(apps) >= 2
+        names = [a["app_name"] for a in apps]
+        assert "TikTok" in names
+        assert "Instagram" in names

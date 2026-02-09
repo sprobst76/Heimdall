@@ -3,10 +3,6 @@
 import uuid
 
 import pytest
-from tests.conftest import requires_pg
-
-
-pytestmark = requires_pg
 
 
 async def _create_child(client, parent) -> str:
@@ -25,7 +21,7 @@ class TestTimeRuleCRUD:
         child_id = await _create_child(client, p)
 
         resp = await client.post(
-            f"/api/v1/children/{child_id}/time-rules/",
+            f"/api/v1/children/{child_id}/rules/",
             headers=p["headers"],
             json={
                 "name": "Wochentag-Regel",
@@ -48,7 +44,7 @@ class TestTimeRuleCRUD:
         # Create two rules
         for name in ("Regel-A", "Regel-B"):
             await client.post(
-                f"/api/v1/children/{child_id}/time-rules/",
+                f"/api/v1/children/{child_id}/rules/",
                 headers=p["headers"],
                 json={
                     "name": name,
@@ -60,7 +56,7 @@ class TestTimeRuleCRUD:
             )
 
         resp = await client.get(
-            f"/api/v1/children/{child_id}/time-rules/",
+            f"/api/v1/children/{child_id}/rules/",
             headers=p["headers"],
         )
         assert resp.status_code == 200
@@ -72,7 +68,7 @@ class TestTimeRuleCRUD:
         child_id = await _create_child(client, p)
 
         create_resp = await client.post(
-            f"/api/v1/children/{child_id}/time-rules/",
+            f"/api/v1/children/{child_id}/rules/",
             headers=p["headers"],
             json={
                 "name": "Update-Regel",
@@ -85,7 +81,7 @@ class TestTimeRuleCRUD:
         rule_id = create_resp.json()["id"]
 
         resp = await client.put(
-            f"/api/v1/children/{child_id}/time-rules/{rule_id}",
+            f"/api/v1/children/{child_id}/rules/{rule_id}",
             headers=p["headers"],
             json={"daily_limit_minutes": 150, "active": False},
         )
@@ -98,7 +94,7 @@ class TestTimeRuleCRUD:
         child_id = await _create_child(client, p)
 
         create_resp = await client.post(
-            f"/api/v1/children/{child_id}/time-rules/",
+            f"/api/v1/children/{child_id}/rules/",
             headers=p["headers"],
             json={
                 "name": "Lösch-Regel",
@@ -111,7 +107,7 @@ class TestTimeRuleCRUD:
         rule_id = create_resp.json()["id"]
 
         resp = await client.delete(
-            f"/api/v1/children/{child_id}/time-rules/{rule_id}",
+            f"/api/v1/children/{child_id}/rules/{rule_id}",
             headers=p["headers"],
         )
         assert resp.status_code == 204

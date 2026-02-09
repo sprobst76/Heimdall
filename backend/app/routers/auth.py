@@ -156,7 +156,10 @@ async def refresh(
             detail="Refresh token not found or already revoked",
         )
 
-    if stored_token.expires_at < datetime.now(timezone.utc):
+    expires = stored_token.expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if expires < datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token expired",

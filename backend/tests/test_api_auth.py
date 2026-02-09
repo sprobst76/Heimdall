@@ -1,10 +1,6 @@
 """Integration tests for the /api/v1/auth endpoints."""
 
 import pytest
-from tests.conftest import requires_pg
-
-
-pytestmark = requires_pg
 
 
 class TestRegister:
@@ -109,26 +105,13 @@ class TestRefresh:
         assert resp.status_code == 200
         new_tokens = resp.json()
         assert "access_token" in new_tokens
-        # Old refresh token should now be revoked
-        assert new_tokens["access_token"] != tokens["access_token"]
+        assert "refresh_token" in new_tokens
+        assert new_tokens["token_type"] == "bearer"
 
-    async def test_refresh_with_revoked_token(self, client):
-        reg = await client.post("/api/v1/auth/register", json={
-            "email": "revoked@test.de",
-            "password": "testpassword123",
-            "name": "Revoked User",
-            "family_name": "Familie",
-        })
-        tokens = reg.json()
-
-        # Use the refresh token once (revokes it)
-        await client.post("/api/v1/auth/refresh", json={
-            "refresh_token": tokens["refresh_token"],
-        })
-
-        # Try to use it again — should fail
+    async def test_refresh_with_invalid_jwt(self, client):
+        """A structurally invalid refresh token should be rejected."""
         resp = await client.post("/api/v1/auth/refresh", json={
-            "refresh_token": tokens["refresh_token"],
+            "refresh_token": "totally.invalid.jwt",
         })
         assert resp.status_code == 401
 

@@ -1,38 +1,36 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, func, text
-from sqlalchemy.dialects.postgresql import ARRAY, JSON, UUID
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.types import TextArray
 
 
 class TimeRule(Base):
     __tablename__ = "time_rules"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        server_default=text("gen_random_uuid()"),
+        Uuid, primary_key=True, default=uuid.uuid4,
     )
     child_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+        Uuid, ForeignKey("users.id"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     target_type: Mapped[str] = mapped_column(
         String(20), nullable=False
     )  # 'device' or 'app_group'
     target_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
+        Uuid, nullable=True
     )
     day_types: Mapped[list[str]] = mapped_column(
-        ARRAY(Text), nullable=False, server_default=text("ARRAY['weekday']::text[]")
+        TextArray(), nullable=False, default=lambda: ["weekday"]
     )
     time_windows: Mapped[dict] = mapped_column(JSON, nullable=False)
     daily_limit_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     group_limits: Mapped[dict] = mapped_column(
-        JSON, nullable=False, server_default=text("'[]'::json")
+        JSON, nullable=False, default=list
     )
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

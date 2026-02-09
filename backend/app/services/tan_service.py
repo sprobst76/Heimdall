@@ -70,7 +70,10 @@ async def validate_tan_redemption(
         )
 
     # 2. TAN must not be expired
-    if tan.expires_at < now:
+    expires_at = tan.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < now:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="TAN has expired",

@@ -3,10 +3,6 @@
 import uuid
 
 import pytest
-from tests.conftest import requires_pg
-
-
-pytestmark = requires_pg
 
 
 class TestCreateChild:
