@@ -1,0 +1,313 @@
+// ── Auth ─────────────────────────────────────────────────────────────────────
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  name: string;
+  family_name: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+}
+
+// ── Family ───────────────────────────────────────────────────────────────────
+
+export interface Family {
+  id: string;
+  name: string;
+  timezone: string;
+  settings: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface FamilyUpdate {
+  name?: string;
+  timezone?: string;
+  settings?: Record<string, unknown>;
+}
+
+// ── User / Children ──────────────────────────────────────────────────────────
+
+export interface User {
+  id: string;
+  family_id: string;
+  name: string;
+  role: 'parent' | 'child';
+  email?: string | null;
+  avatar_url?: string | null;
+  age?: number | null;
+  created_at: string;
+}
+
+export interface ChildCreate {
+  name: string;
+  age?: number | null;
+  avatar_url?: string | null;
+  pin?: string | null;
+}
+
+export interface ChildUpdate {
+  name?: string;
+  age?: number | null;
+  avatar_url?: string | null;
+}
+
+// ── Device ───────────────────────────────────────────────────────────────────
+
+export interface Device {
+  id: string;
+  child_id: string;
+  name: string;
+  type: string;
+  device_identifier: string;
+  status: string;
+  last_seen?: string | null;
+  created_at: string;
+}
+
+export interface DeviceCreate {
+  name: string;
+  type: string;
+  device_identifier: string;
+}
+
+export interface DeviceCoupling {
+  id: string;
+  child_id: string;
+  device_ids: string[];
+  shared_budget: boolean;
+  created_at: string;
+}
+
+// ── App Group ────────────────────────────────────────────────────────────────
+
+export interface AppGroupApp {
+  id: string;
+  app_name: string;
+  app_package?: string | null;
+  app_executable?: string | null;
+  platform: string;
+}
+
+export interface AppGroup {
+  id: string;
+  child_id: string;
+  name: string;
+  icon?: string | null;
+  color?: string | null;
+  category: string;
+  risk_level: string;
+  always_allowed: boolean;
+  tan_allowed: boolean;
+  max_tan_bonus_per_day?: number | null;
+  apps: AppGroupApp[];
+  created_at: string;
+}
+
+export interface AppGroupCreate {
+  name: string;
+  icon?: string | null;
+  color?: string | null;
+  category: string;
+  risk_level?: string;
+  always_allowed?: boolean;
+  tan_allowed?: boolean;
+  max_tan_bonus_per_day?: number | null;
+}
+
+export interface AppGroupUpdate {
+  name?: string;
+  icon?: string | null;
+  color?: string | null;
+  category?: string;
+  risk_level?: string;
+  always_allowed?: boolean;
+  tan_allowed?: boolean;
+  max_tan_bonus_per_day?: number | null;
+}
+
+export interface AppCreate {
+  app_name: string;
+  app_package?: string | null;
+  app_executable?: string | null;
+  platform: string;
+}
+
+// ── Time Rule ────────────────────────────────────────────────────────────────
+
+export interface TimeWindow {
+  start: string; // "HH:MM"
+  end: string;   // "HH:MM"
+  note?: string | null;
+}
+
+export interface GroupLimit {
+  group_id: string;
+  max_minutes: number;
+}
+
+export interface TimeRule {
+  id: string;
+  child_id: string;
+  name: string;
+  target_type: string;
+  target_id?: string | null;
+  day_types: string[];
+  time_windows: TimeWindow[];
+  daily_limit_minutes?: number | null;
+  group_limits: GroupLimit[];
+  priority: number;
+  active: boolean;
+  valid_from?: string | null;
+  valid_until?: string | null;
+  created_at: string;
+}
+
+export interface TimeRuleCreate {
+  name: string;
+  target_type: string;
+  target_id?: string | null;
+  day_types?: string[];
+  time_windows: TimeWindow[];
+  daily_limit_minutes?: number | null;
+  group_limits?: GroupLimit[];
+  priority?: number;
+  valid_from?: string | null;
+  valid_until?: string | null;
+}
+
+export interface TimeRuleUpdate {
+  name?: string;
+  day_types?: string[];
+  time_windows?: TimeWindow[];
+  daily_limit_minutes?: number | null;
+  group_limits?: GroupLimit[];
+  priority?: number;
+  active?: boolean;
+  valid_from?: string | null;
+  valid_until?: string | null;
+}
+
+// ── TAN ──────────────────────────────────────────────────────────────────────
+
+export interface TAN {
+  id: string;
+  child_id: string;
+  code: string;
+  type: string;
+  scope_groups?: string[] | null;
+  scope_devices?: string[] | null;
+  value_minutes?: number | null;
+  value_unlock_until?: string | null;
+  expires_at: string;
+  single_use: boolean;
+  source?: string | null;
+  status: string;
+  redeemed_at?: string | null;
+  created_at: string;
+}
+
+export interface TANCreate {
+  type: string;
+  scope_groups?: string[] | null;
+  scope_devices?: string[] | null;
+  value_minutes?: number | null;
+  value_unlock_until?: string | null;
+  expires_at?: string | null;
+  single_use?: boolean;
+}
+
+export interface TANRedeemRequest {
+  code: string;
+}
+
+// ── Quest ────────────────────────────────────────────────────────────────────
+
+export interface QuestTemplate {
+  id: string;
+  family_id: string;
+  name: string;
+  description?: string | null;
+  category: string;
+  reward_minutes: number;
+  tan_groups?: string[] | null;
+  proof_type: string;
+  ai_verify: boolean;
+  recurrence: string;
+  active: boolean;
+  created_at: string;
+}
+
+export interface QuestTemplateCreate {
+  name: string;
+  description?: string | null;
+  category: string;
+  reward_minutes: number;
+  tan_groups?: string[] | null;
+  proof_type: string;
+  ai_verify?: boolean;
+  ai_prompt?: string | null;
+  recurrence: string;
+  auto_detect_app?: string | null;
+  auto_detect_minutes?: number | null;
+}
+
+export interface QuestTemplateUpdate {
+  name?: string;
+  description?: string | null;
+  category?: string;
+  reward_minutes?: number;
+  proof_type?: string;
+  ai_verify?: boolean;
+  recurrence?: string;
+  active?: boolean;
+}
+
+export interface QuestInstance {
+  id: string;
+  template_id: string;
+  child_id: string;
+  status: string;
+  claimed_at?: string | null;
+  proof_url?: string | null;
+  ai_result?: Record<string, unknown> | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  generated_tan_id?: string | null;
+  created_at: string;
+}
+
+export interface QuestSubmitProof {
+  proof_type: string;
+  proof_url: string;
+}
+
+export interface QuestReview {
+  approved: boolean;
+  feedback?: string | null;
+}
+
+// ── Day Type ─────────────────────────────────────────────────────────────────
+
+export interface DayTypeOverride {
+  id: string;
+  family_id: string;
+  date: string;
+  day_type: string;
+  label?: string | null;
+  source: string;
+}
+
+export interface DayTypeOverrideCreate {
+  date: string;
+  day_type: string;
+  label?: string | null;
+}
