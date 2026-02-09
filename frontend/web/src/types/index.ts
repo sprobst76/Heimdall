@@ -350,3 +350,63 @@ export interface ChatMessage {
 export interface ChatResponse {
   response: string;
 }
+
+// ── Analytics ────────────────────────────────────────────────────────────────
+
+export interface GroupUsage {
+  app_group_id: string | null;
+  group_name: string;
+  minutes: number;
+  percentage: number;
+}
+
+export interface DailySummary {
+  date: string;
+  total_minutes: number;
+  group_breakdown: GroupUsage[];
+  quests_completed: number;
+  tans_redeemed: number;
+  blocked_attempts: number;
+}
+
+export interface HeatmapEntry {
+  hour: number;
+  day: number;
+  minutes: number;
+}
+
+export interface WeeklyTrend {
+  week_start: string;
+  total_minutes: number;
+  quests_completed: number;
+  tans_redeemed: number;
+}
+
+export interface ChildDashboardStats {
+  child_id: string;
+  child_name: string;
+  usage_today_minutes: number;
+  daily_limit_minutes: number | null;
+  active_tans: number;
+  quests_completed_today: number;
+  current_streak: number;
+  devices_online: number;
+  top_group: string | null;
+}
+
+export interface FamilyDashboardStats {
+  total_children: number;
+  total_active_rules: number;
+  tans_today: number;
+  total_usage_today_minutes: number;
+}
+
+export interface AnalyticsResponse {
+  child_id: string;
+  child_name: string;
+  period: string;
+  daily_summaries: DailySummary[];
+  heatmap: HeatmapEntry[];
+  trends: WeeklyTrend[];
+  group_breakdown: GroupUsage[];
+}

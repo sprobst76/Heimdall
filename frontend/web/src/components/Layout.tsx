@@ -9,6 +9,7 @@ import {
   Trophy,
   ClipboardCheck,
   Brain,
+  BarChart3,
   LogOut,
   Menu,
   X,
@@ -156,6 +157,14 @@ export default function Layout() {
                       >
                         <Trophy className="h-3.5 w-3.5" />
                         Quests
+                      </NavLink>
+                      <NavLink
+                        to={`/analytics/${child.id}`}
+                        className={childNavClasses}
+                        onClick={() => setSidebarOpen(false)}
+                      >
+                        <BarChart3 className="h-3.5 w-3.5" />
+                        Analytik
                       </NavLink>
                     </div>
                   </div>
