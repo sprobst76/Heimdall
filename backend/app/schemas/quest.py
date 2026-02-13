@@ -16,6 +16,7 @@ class QuestTemplateCreate(BaseModel):
     recurrence: str  # daily | weekly | school_days | once
     auto_detect_app: str | None = None
     auto_detect_minutes: int | None = None
+    streak_threshold: int | None = None
 
 
 class QuestTemplateUpdate(BaseModel):
@@ -27,6 +28,7 @@ class QuestTemplateUpdate(BaseModel):
     ai_verify: bool | None = None
     recurrence: str | None = None
     active: bool | None = None
+    streak_threshold: int | None = None
 
 
 class QuestTemplateResponse(BaseModel):
@@ -40,6 +42,9 @@ class QuestTemplateResponse(BaseModel):
     proof_type: str
     ai_verify: bool
     recurrence: str
+    auto_detect_app: str | None = None
+    auto_detect_minutes: int | None = None
+    streak_threshold: int | None = None
     active: bool
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)

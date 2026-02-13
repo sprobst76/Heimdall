@@ -7,13 +7,19 @@ generating TANs on approval, and streak detection.
 import uuid
 from datetime import datetime, time, timezone
 
+import logging
+
 from fastapi import HTTPException, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.quest import QuestInstance, QuestTemplate
 from app.models.tan import TAN
+from app.models.usage import UsageEvent
+from app.models.user import User
 from app.services.tan_service import generate_tan_code
+
+logger = logging.getLogger(__name__)
 
 
 async def create_instances_for_child(
@@ -141,6 +147,11 @@ async def review_quest(
 
     await db.flush()
     await db.refresh(instance)
+
+    # Check if streak bonus triggered after approval
+    if approved:
+        await check_streak_bonus(db, instance.child_id)
+
     return instance
 
 
@@ -196,7 +207,17 @@ async def get_active_streak(
         .group_by(func.date(QuestInstance.reviewed_at))
         .order_by(func.date(QuestInstance.reviewed_at).desc())
     )
-    dates = [row[0] for row in result.all()]
+    # func.date() returns strings on SQLite, date objects on PostgreSQL
+    raw_dates = [row[0] for row in result.all()]
+    from datetime import date as date_type
+    dates = []
+    for d in raw_dates:
+        if isinstance(d, str):
+            dates.append(date_type.fromisoformat(d))
+        elif isinstance(d, date_type):
+            dates.append(d)
+        elif d is not None:
+            dates.append(d)
 
     if not dates:
         return 0
@@ -270,3 +291,176 @@ async def get_child_quest_stats(
         "minutes_earned_today": earned_result.scalar() or 0,
         "current_streak": streak,
     }
+
+
+async def check_auto_detect_quests(
+    db: AsyncSession,
+    child_id: uuid.UUID,
+    app_package: str,
+) -> list[QuestInstance]:
+    """Check if any auto-detect quests are satisfied by current usage.
+
+    Called after usage events. If today's total usage for app_package
+    meets a quest's auto_detect_minutes threshold, the quest is
+    automatically claimed and approved with a reward TAN.
+
+    Returns list of auto-approved instances.
+    """
+    now = datetime.now(timezone.utc)
+    today_start = datetime.combine(now.date(), time(0, 0), tzinfo=timezone.utc)
+
+    # Find child's family
+    child_result = await db.execute(select(User).where(User.id == child_id))
+    child = child_result.scalar_one_or_none()
+    if child is None:
+        return []
+
+    # Find matching auto-detect templates
+    templates_result = await db.execute(
+        select(QuestTemplate).where(
+            QuestTemplate.family_id == child.family_id,
+            QuestTemplate.active == True,  # noqa: E712
+            QuestTemplate.auto_detect_app == app_package,
+            QuestTemplate.auto_detect_minutes.isnot(None),
+        )
+    )
+    templates = templates_result.scalars().all()
+
+    if not templates:
+        return []
+
+    # Calculate today's total usage for this app
+    usage_result = await db.execute(
+        select(func.coalesce(func.sum(UsageEvent.duration_seconds), 0)).where(
+            UsageEvent.child_id == child_id,
+            UsageEvent.app_package == app_package,
+            UsageEvent.started_at >= today_start,
+        )
+    )
+    total_seconds = usage_result.scalar() or 0
+
+    approved_instances = []
+
+    for template in templates:
+        threshold_seconds = template.auto_detect_minutes * 60
+        if total_seconds < threshold_seconds:
+            continue
+
+        # Find open instance for this template (available or claimed)
+        instance_result = await db.execute(
+            select(QuestInstance).where(
+                QuestInstance.template_id == template.id,
+                QuestInstance.child_id == child_id,
+                QuestInstance.status.in_(["available", "claimed"]),
+                QuestInstance.created_at >= today_start,
+            )
+        )
+        instance = instance_result.scalar_one_or_none()
+
+        if instance is None:
+            continue
+
+        # Auto-approve: claim → approve → generate TAN
+        if instance.status == "available":
+            instance.status = "claimed"
+            instance.claimed_at = now
+
+        instance.status = "approved"
+        instance.proof_type = "auto"
+        instance.reviewed_at = now
+
+        tan = await _generate_reward_tan(db, instance, template)
+        instance.generated_tan_id = tan.id
+
+        await db.flush()
+        await db.refresh(instance)
+        approved_instances.append(instance)
+
+        logger.info(
+            "Auto-detect quest approved: child=%s, app=%s, template=%s",
+            child_id, app_package, template.name,
+        )
+
+    # Check streak bonus if any quests were auto-approved
+    if approved_instances:
+        await check_streak_bonus(db, child_id)
+
+    return approved_instances
+
+
+async def check_streak_bonus(
+    db: AsyncSession,
+    child_id: uuid.UUID,
+) -> QuestInstance | None:
+    """Check if child qualifies for a streak bonus quest.
+
+    Called after quest approval. If the child's current streak meets
+    a streak template's threshold and no bonus was awarded today,
+    auto-creates and approves the bonus quest with a reward TAN.
+
+    Returns the bonus instance or None.
+    """
+    now = datetime.now(timezone.utc)
+    today_start = datetime.combine(now.date(), time(0, 0), tzinfo=timezone.utc)
+
+    streak = await get_active_streak(db, child_id)
+    if streak < 1:
+        return None
+
+    # Find child's family
+    child_result = await db.execute(select(User).where(User.id == child_id))
+    child = child_result.scalar_one_or_none()
+    if child is None:
+        return None
+
+    # Find streak bonus templates that match current streak
+    templates_result = await db.execute(
+        select(QuestTemplate).where(
+            QuestTemplate.family_id == child.family_id,
+            QuestTemplate.active == True,  # noqa: E712
+            QuestTemplate.streak_threshold.isnot(None),
+            QuestTemplate.streak_threshold <= streak,
+        )
+    )
+    templates = templates_result.scalars().all()
+
+    for template in templates:
+        # Check if bonus already awarded today for this template
+        existing_result = await db.execute(
+            select(func.count(QuestInstance.id)).where(
+                QuestInstance.template_id == template.id,
+                QuestInstance.child_id == child_id,
+                QuestInstance.status == "approved",
+                QuestInstance.reviewed_at >= today_start,
+            )
+        )
+        already_awarded = (existing_result.scalar() or 0) > 0
+
+        if already_awarded:
+            continue
+
+        # Create and auto-approve streak bonus
+        instance = QuestInstance(
+            template_id=template.id,
+            child_id=child_id,
+            status="approved",
+            claimed_at=now,
+            proof_type="auto",
+            reviewed_at=now,
+        )
+        db.add(instance)
+        await db.flush()
+
+        tan = await _generate_reward_tan(db, instance, template)
+        instance.generated_tan_id = tan.id
+
+        await db.flush()
+        await db.refresh(instance)
+
+        logger.info(
+            "Streak bonus awarded: child=%s, streak=%d, template=%s, reward=%d min",
+            child_id, streak, template.name, template.reward_minutes,
+        )
+        return instance
+
+    return None

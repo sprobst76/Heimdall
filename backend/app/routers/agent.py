@@ -24,7 +24,9 @@ from app.schemas.agent import (
     UsageEventResponse,
 )
 from app.services.connection_manager import connection_manager
+from app.services.quest_service import check_auto_detect_quests
 from app.services.rule_engine import get_current_rules
+from app.services.rule_push_service import push_rules_to_child_devices
 
 router = APIRouter(prefix="/agent", tags=["Device Agent"])
 
@@ -94,6 +96,12 @@ async def report_usage_event(
     db.add(event)
     await db.flush()
     await db.refresh(event)
+
+    # Check if any auto-detect quests are now satisfied
+    if body.app_package and body.duration_seconds:
+        approved = await check_auto_detect_quests(db, device.child_id, body.app_package)
+        if approved:
+            await push_rules_to_child_devices(db, device.child_id)
 
     return UsageEventResponse(id=event.id, status="recorded")
 
@@ -185,6 +193,14 @@ async def websocket_endpoint(
                     )
                     db.add(event)
                     await db.flush()
+
+                    # Check auto-detect quests
+                    approved = await check_auto_detect_quests(
+                        db, device.child_id, data["app_package"],
+                    )
+                    if approved:
+                        await push_rules_to_child_devices(db, device.child_id)
+
                 await websocket.send_json({
                     "type": "ack",
                     "received_type": "usage_update",

@@ -30,6 +30,7 @@ class QuestTemplate(Base):
     recurrence: Mapped[str] = mapped_column(String(30), nullable=False)
     auto_detect_app: Mapped[str | None] = mapped_column(String(255), nullable=True)
     auto_detect_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    streak_threshold: Mapped[int | None] = mapped_column(Integer, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
