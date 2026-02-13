@@ -23,6 +23,7 @@ from app.schemas.agent import (
     UsageEventRequest,
     UsageEventResponse,
 )
+from app.services.connection_manager import connection_manager
 from app.services.rule_engine import get_current_rules
 
 router = APIRouter(prefix="/agent", tags=["Device Agent"])
@@ -116,9 +117,13 @@ async def websocket_endpoint(
 
     The device must send its device token as the first message after
     connecting. The server validates the token and then enters a
-    ping/pong message loop.
+    bidirectional message loop.
+
+    Server can push: rules_updated, block, unblock, tan_activated.
+    Device can send: ping, heartbeat, usage_update, status_report.
     """
     await websocket.accept()
+    device = None
 
     try:
         # First message must be the device token for authentication
@@ -147,6 +152,9 @@ async def websocket_endpoint(
         device.last_seen = datetime.now(timezone.utc)
         await db.flush()
 
+        # Register connection for bidirectional push
+        await connection_manager.connect(device.id, device.child_id, websocket)
+
         # Message loop
         while True:
             data = await websocket.receive_json()
@@ -164,6 +172,28 @@ async def websocket_endpoint(
                     "type": "heartbeat_ack",
                     "server_time": datetime.now(timezone.utc).isoformat(),
                 })
+            elif msg_type == "usage_update":
+                if data.get("app_package") and data.get("duration_seconds"):
+                    event = UsageEvent(
+                        device_id=device.id,
+                        child_id=device.child_id,
+                        app_package=data["app_package"],
+                        app_group_id=uuid.UUID(data["app_group_id"]) if data.get("app_group_id") else None,
+                        event_type="update",
+                        duration_seconds=data["duration_seconds"],
+                        started_at=datetime.now(timezone.utc),
+                    )
+                    db.add(event)
+                    await db.flush()
+                await websocket.send_json({
+                    "type": "ack",
+                    "received_type": "usage_update",
+                })
+            elif msg_type == "status_report":
+                await websocket.send_json({
+                    "type": "ack",
+                    "received_type": "status_report",
+                })
             else:
                 # Unknown message type - acknowledge but do nothing
                 await websocket.send_json({
@@ -172,11 +202,12 @@ async def websocket_endpoint(
                 })
 
     except WebSocketDisconnect:
-        # Client disconnected gracefully
         pass
     except Exception:
-        # Unexpected error - close the connection
         try:
             await websocket.close(code=1011)
         except Exception:
             pass
+    finally:
+        if device is not None:
+            await connection_manager.disconnect(device.id, device.child_id)

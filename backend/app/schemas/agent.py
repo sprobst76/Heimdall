@@ -34,4 +34,7 @@ class ResolvedRules(BaseModel):
     time_windows: list[dict] = []
     group_limits: list[dict] = []
     daily_limit_minutes: int | None = None
+    remaining_minutes: int | None = None
     active_tans: list[dict] = []
+    coupled_devices: list[str] = []
+    shared_budget: bool = False

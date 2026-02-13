@@ -15,6 +15,7 @@ from app.database import get_db
 from app.models.tan import TAN
 from app.models.user import User
 from app.schemas.tan import TANCreate, TANRedeemRequest, TANResponse
+from app.services.rule_push_service import notify_tan_activated, push_rules_to_child_devices
 from app.services.tan_service import generate_tan_code, redeem_tan, validate_tan_redemption
 
 router = APIRouter(prefix="/children/{child_id}/tans", tags=["TANs"])
@@ -138,6 +139,16 @@ async def redeem_tan_endpoint(
     # Redeem the TAN
     await redeem_tan(db, tan)
 
+    # Notify devices about TAN activation + push updated rules
+    await notify_tan_activated(
+        child_id=child_id,
+        tan_id=tan.id,
+        tan_type=tan.type,
+        value_minutes=tan.value_minutes,
+        expires_at=tan.expires_at.isoformat() if tan.expires_at else None,
+    )
+    await push_rules_to_child_devices(db, child_id)
+
     return tan
 
 
@@ -167,4 +178,5 @@ async def invalidate_tan(
 
     tan.status = "expired"
     await db.flush()
+    await push_rules_to_child_devices(db, child_id)
     return None

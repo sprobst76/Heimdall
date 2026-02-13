@@ -23,6 +23,8 @@ from app.schemas.device import (
     DeviceResponse,
     DeviceUpdate,
 )
+from app.services.connection_manager import connection_manager
+from app.services.rule_push_service import push_rules_to_child_devices
 
 router = APIRouter(prefix="/children/{child_id}/devices", tags=["Devices"])
 
@@ -220,4 +222,99 @@ async def set_device_coupling(
 
     await db.flush()
     await db.refresh(coupling)
+    await push_rules_to_child_devices(db, child_id)
     return coupling
+
+
+@router.post("/block-all", status_code=status.HTTP_200_OK)
+async def block_all_devices(
+    child_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: User = Depends(require_parent),
+):
+    """Block all devices for a child. Requires parent role."""
+    await _verify_child_access(db, child_id, current_user)
+
+    message = {
+        "type": "block",
+        "reason": "parent_action",
+        "message": "All devices blocked by parent",
+    }
+    count = await connection_manager.send_to_child_devices(child_id, message)
+
+    return {
+        "status": "ok",
+        "devices_notified": count,
+        "message": f"Block signal sent to {count} connected device(s)",
+    }
+
+
+@router.post("/{device_id}/block", status_code=status.HTTP_200_OK)
+async def block_device(
+    child_id: uuid.UUID,
+    device_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: User = Depends(require_parent),
+):
+    """Block a specific device. Requires parent role."""
+    await _verify_child_access(db, child_id, current_user)
+
+    result = await db.execute(
+        select(Device).where(
+            Device.id == device_id,
+            Device.child_id == child_id,
+        )
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Device not found",
+        )
+
+    message = {
+        "type": "block",
+        "reason": "parent_action",
+        "message": "Device blocked by parent",
+    }
+    success = await connection_manager.send_to_device(device_id, message)
+
+    return {
+        "status": "ok",
+        "device_connected": success,
+        "message": "Block signal sent" if success else "Device not connected",
+    }
+
+
+@router.post("/{device_id}/unblock", status_code=status.HTTP_200_OK)
+async def unblock_device(
+    child_id: uuid.UUID,
+    device_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: User = Depends(require_parent),
+):
+    """Unblock a specific device. Requires parent role."""
+    await _verify_child_access(db, child_id, current_user)
+
+    result = await db.execute(
+        select(Device).where(
+            Device.id == device_id,
+            Device.child_id == child_id,
+        )
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Device not found",
+        )
+
+    message = {
+        "type": "unblock",
+        "message": "Device unblocked by parent",
+    }
+    success = await connection_manager.send_to_device(device_id, message)
+
+    return {
+        "status": "ok",
+        "device_connected": success,
+        "message": "Unblock signal sent" if success else "Device not connected",
+    }

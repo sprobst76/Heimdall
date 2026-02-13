@@ -15,6 +15,7 @@ from app.database import get_db
 from app.models.time_rule import TimeRule
 from app.models.user import User
 from app.schemas.time_rule import TimeRuleCreate, TimeRuleResponse, TimeRuleUpdate
+from app.services.rule_push_service import push_rules_to_child_devices
 
 router = APIRouter(prefix="/children/{child_id}/rules", tags=["Time Rules"])
 
@@ -84,6 +85,7 @@ async def create_rule(
     db.add(rule)
     await db.flush()
     await db.refresh(rule)
+    await push_rules_to_child_devices(db, child_id)
     return rule
 
 
@@ -158,6 +160,7 @@ async def update_rule(
 
     await db.flush()
     await db.refresh(rule)
+    await push_rules_to_child_devices(db, child_id)
     return rule
 
 
@@ -187,4 +190,5 @@ async def delete_rule(
 
     await db.delete(rule)
     await db.flush()
+    await push_rules_to_child_devices(db, child_id)
     return None

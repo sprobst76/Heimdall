@@ -22,6 +22,7 @@ from app.schemas.app_group import (
     AppGroupUpdate,
     AppResponse,
 )
+from app.services.rule_push_service import push_rules_to_child_devices
 
 router = APIRouter(prefix="/children/{child_id}/app-groups", tags=["App Groups"])
 
@@ -89,6 +90,7 @@ async def create_app_group(
     db.add(group)
     await db.flush()
     await db.refresh(group, attribute_names=["apps"])
+    await push_rules_to_child_devices(db, child_id)
     return group
 
 
@@ -148,6 +150,7 @@ async def update_app_group(
 
     await db.flush()
     await db.refresh(group)
+    await push_rules_to_child_devices(db, child_id)
     return group
 
 
@@ -177,6 +180,7 @@ async def delete_app_group(
 
     await db.delete(group)
     await db.flush()
+    await push_rules_to_child_devices(db, child_id)
     return None
 
 
@@ -226,6 +230,7 @@ async def set_apps_for_group(
     for app_entry in new_apps:
         await db.refresh(app_entry)
 
+    await push_rules_to_child_devices(db, child_id)
     return new_apps
 
 
@@ -264,4 +269,5 @@ async def add_app_to_group(
     db.add(app_entry)
     await db.flush()
     await db.refresh(app_entry)
+    await push_rules_to_child_devices(db, child_id)
     return app_entry
