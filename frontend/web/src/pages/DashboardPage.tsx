@@ -118,7 +118,7 @@ function ChildCard({ child }: { child: User }) {
           className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-100"
         >
           <Plus className="h-3.5 w-3.5" />
-          TAN erstellen
+          TAN
         </button>
         <button
           onClick={() => navigate(`/rules/${child.id}`)}
@@ -126,6 +126,13 @@ function ChildCard({ child }: { child: User }) {
         >
           <Shield className="h-3.5 w-3.5" />
           Regeln
+        </button>
+        <button
+          onClick={() => navigate(`/devices/${child.id}`)}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-200"
+        >
+          <Monitor className="h-3.5 w-3.5" />
+          Gerate
         </button>
       </div>
 

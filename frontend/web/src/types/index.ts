@@ -241,7 +241,11 @@ export interface QuestTemplate {
   tan_groups?: string[] | null;
   proof_type: string;
   ai_verify: boolean;
+  ai_prompt?: string | null;
   recurrence: string;
+  auto_detect_app?: string | null;
+  auto_detect_minutes?: number | null;
+  streak_threshold?: number | null;
   active: boolean;
   created_at: string;
 }
@@ -267,7 +271,11 @@ export interface QuestTemplateUpdate {
   reward_minutes?: number;
   proof_type?: string;
   ai_verify?: boolean;
+  ai_prompt?: string | null;
   recurrence?: string;
+  auto_detect_app?: string | null;
+  auto_detect_minutes?: number | null;
+  streak_threshold?: number | null;
   active?: boolean;
 }
 

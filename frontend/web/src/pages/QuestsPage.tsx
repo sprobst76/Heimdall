@@ -124,6 +124,11 @@ export default function QuestsPage() {
   const [formRewardMinutes, setFormRewardMinutes] = useState('15');
   const [formProofType, setFormProofType] = useState('parent_confirm');
   const [formRecurrence, setFormRecurrence] = useState('daily');
+  const [formStreakThreshold, setFormStreakThreshold] = useState('');
+  const [formAutoDetectApp, setFormAutoDetectApp] = useState('');
+  const [formAutoDetectMinutes, setFormAutoDetectMinutes] = useState('');
+  const [formAiVerify, setFormAiVerify] = useState(false);
+  const [formAiPrompt, setFormAiPrompt] = useState('');
   const [formError, setFormError] = useState('');
 
   // Review state
@@ -143,6 +148,11 @@ export default function QuestsPage() {
     setFormRewardMinutes('15');
     setFormProofType('parent_confirm');
     setFormRecurrence('daily');
+    setFormStreakThreshold('');
+    setFormAutoDetectApp('');
+    setFormAutoDetectMinutes('');
+    setFormAiVerify(false);
+    setFormAiPrompt('');
     setFormError('');
     setShowForm(true);
   }
@@ -155,6 +165,11 @@ export default function QuestsPage() {
     setFormRewardMinutes(String(template.reward_minutes));
     setFormProofType(template.proof_type);
     setFormRecurrence(template.recurrence);
+    setFormStreakThreshold(template.streak_threshold != null ? String(template.streak_threshold) : '');
+    setFormAutoDetectApp(template.auto_detect_app ?? '');
+    setFormAutoDetectMinutes(template.auto_detect_minutes != null ? String(template.auto_detect_minutes) : '');
+    setFormAiVerify(template.ai_verify);
+    setFormAiPrompt(template.ai_prompt ?? '');
     setFormError('');
     setShowForm(true);
   }
@@ -179,6 +194,9 @@ export default function QuestsPage() {
       return;
     }
 
+    const streakVal = parseInt(formStreakThreshold);
+    const autoMinVal = parseInt(formAutoDetectMinutes);
+
     try {
       if (editingTemplate) {
         await updateTemplate.mutateAsync({
@@ -190,6 +208,11 @@ export default function QuestsPage() {
             reward_minutes: reward,
             proof_type: formProofType,
             recurrence: formRecurrence,
+            streak_threshold: streakVal > 0 ? streakVal : null,
+            auto_detect_app: formProofType === 'auto' && formAutoDetectApp.trim() ? formAutoDetectApp.trim() : null,
+            auto_detect_minutes: formProofType === 'auto' && autoMinVal > 0 ? autoMinVal : null,
+            ai_verify: formProofType === 'photo' ? formAiVerify : false,
+            ai_prompt: formAiVerify && formAiPrompt.trim() ? formAiPrompt.trim() : null,
           },
         });
       } else {
@@ -200,7 +223,12 @@ export default function QuestsPage() {
           reward_minutes: reward,
           proof_type: formProofType,
           recurrence: formRecurrence,
+          auto_detect_app: formProofType === 'auto' && formAutoDetectApp.trim() ? formAutoDetectApp.trim() : null,
+          auto_detect_minutes: formProofType === 'auto' && autoMinVal > 0 ? autoMinVal : null,
+          ai_verify: formProofType === 'photo' ? formAiVerify : false,
+          ai_prompt: formAiVerify && formAiPrompt.trim() ? formAiPrompt.trim() : null,
         };
+        if (streakVal > 0) payload.streak_threshold = streakVal;
         await createTemplate.mutateAsync(payload);
       }
       closeForm();
@@ -852,6 +880,87 @@ export default function QuestsPage() {
                   ))}
                 </select>
               </div>
+
+              {/* Streak threshold */}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Streak-Schwelle (Tage)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={formStreakThreshold}
+                  onChange={(e) => setFormStreakThreshold(e.target.value)}
+                  placeholder="z.B. 7"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+                <p className="mt-1 text-xs text-slate-400">
+                  Bonus nach X aufeinanderfolgenden Tagen
+                </p>
+              </div>
+
+              {/* Auto-detect fields (only when proof_type is 'auto') */}
+              {formProofType === 'auto' && (
+                <>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      App-Paketname
+                    </label>
+                    <input
+                      type="text"
+                      value={formAutoDetectApp}
+                      onChange={(e) => setFormAutoDetectApp(e.target.value)}
+                      placeholder="z.B. com.duolingo"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Automatisch nach (Minuten)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formAutoDetectMinutes}
+                      onChange={(e) => setFormAutoDetectMinutes(e.target.value)}
+                      placeholder="z.B. 30"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* AI verify (only when proof_type is 'photo') */}
+              {formProofType === 'photo' && (
+                <>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="ai-verify"
+                      checked={formAiVerify}
+                      onChange={(e) => setFormAiVerify(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label htmlFor="ai-verify" className="text-sm font-medium text-slate-700">
+                      KI-Prufung aktivieren
+                    </label>
+                  </div>
+                  {formAiVerify && (
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-700">
+                        KI-Prufungsanweisung
+                      </label>
+                      <textarea
+                        value={formAiPrompt}
+                        onChange={(e) => setFormAiPrompt(e.target.value)}
+                        rows={2}
+                        placeholder="Worauf soll die KI achten?"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
 
               {/* Submit */}
               <div className="flex gap-3 pt-2">
