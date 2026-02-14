@@ -149,3 +149,23 @@ class TestLogout:
             "refresh_token": "does.not.exist",
         })
         assert resp.status_code == 204
+
+
+class TestGetMe:
+    async def test_get_me_returns_user_info(self, client, registered_parent):
+        """GET /auth/me returns the authenticated user's basic info."""
+        resp = await client.get(
+            "/api/v1/auth/me",
+            headers=registered_parent["headers"],
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["id"] == registered_parent["user_id"]
+        assert data["family_id"] == registered_parent["family_id"]
+        assert data["name"] == "Test Eltern"
+        assert data["role"] == "parent"
+
+    async def test_get_me_unauthorized(self, client):
+        """GET /auth/me without a token returns 401."""
+        resp = await client.get("/api/v1/auth/me")
+        assert resp.status_code == 401

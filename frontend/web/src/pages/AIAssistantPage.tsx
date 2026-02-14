@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Brain,
@@ -11,11 +11,13 @@ import {
   CheckCircle2,
   Clock,
   Calendar,
+  MessageCircle,
+  Send,
 } from 'lucide-react';
 import { useChildren } from '../hooks/useChildren';
 import { useCreateRule } from '../hooks/useRules';
-import { useParseRule, useWeeklyReport } from '../hooks/useLLM';
-import type { ParseRuleResponse, WeeklyReportResponse } from '../types';
+import { useParseRule, useWeeklyReport, useChat } from '../hooks/useLLM';
+import type { ChatMessage, ParseRuleResponse, WeeklyReportResponse } from '../types';
 
 const FAMILY_ID = 'demo';
 
@@ -44,6 +46,12 @@ export default function AIAssistantPage() {
   const [reportChildId, setReportChildId] = useState('');
   const weeklyReport = useWeeklyReport();
   const [report, setReport] = useState<WeeklyReportResponse | null>(null);
+
+  // ── Chat state ────────────────────────────────────────────────────────
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const chat = useChat();
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   // ── Handlers ────────────────────────────────────────────────────────────
 
@@ -92,6 +100,31 @@ export default function AIAssistantPage() {
     } catch {
       // error is in weeklyReport.error
     }
+  }
+
+  async function handleSendChat() {
+    const text = chatInput.trim();
+    if (!text || chat.isPending) return;
+
+    const userMsg: ChatMessage = { role: 'user', content: text };
+    const updated = [...chatMessages, userMsg];
+    setChatMessages(updated);
+    setChatInput('');
+
+    try {
+      const result = await chat.mutateAsync({ message: text, history: updated });
+      setChatMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: result.response },
+      ]);
+    } catch {
+      setChatMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: 'Entschuldigung, es ist ein Fehler aufgetreten.' },
+      ]);
+    }
+
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
   }
 
   // ── Render helpers ──────────────────────────────────────────────────────
@@ -441,6 +474,80 @@ export default function AIAssistantPage() {
               </div>
             </div>
           )}
+        </div>
+      </section>
+
+      {/* ── Section 3: KI-Chat ──────────────────────────────────────────── */}
+      <section className="mb-10">
+        <div className="mb-4 flex items-center gap-2">
+          <MessageCircle className="h-5 w-5 text-indigo-500" />
+          <h2 className="text-lg font-semibold text-slate-900">KI-Chat</h2>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+          <p className="border-b border-slate-100 px-6 py-3 text-sm text-slate-500">
+            Stellen Sie Fragen zu Bildschirmzeit, Regeln oder Erziehungstipps.
+          </p>
+
+          {/* Messages */}
+          <div className="h-80 overflow-y-auto px-6 py-4 space-y-3">
+            {chatMessages.length === 0 && (
+              <p className="py-12 text-center text-sm text-slate-400">
+                Noch keine Nachrichten. Stellen Sie eine Frage!
+              </p>
+            )}
+            {chatMessages.map((msg, i) => (
+              <div
+                key={i}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[80%] rounded-xl px-4 py-2.5 text-sm ${
+                    msg.role === 'user'
+                      ? 'bg-indigo-600 text-white rounded-br-sm'
+                      : 'bg-slate-100 text-slate-800 rounded-bl-sm'
+                  }`}
+                >
+                  {msg.content}
+                </div>
+              </div>
+            ))}
+            {chat.isPending && (
+              <div className="flex justify-start">
+                <div className="flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm text-slate-500 rounded-bl-sm">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Denke nach...
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="border-t border-slate-100 px-4 py-3">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendChat();
+              }}
+              className="flex gap-2"
+            >
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Nachricht eingeben..."
+                className="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+              <button
+                type="submit"
+                disabled={chat.isPending || !chatInput.trim()}
+                className="flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </form>
+          </div>
         </div>
       </section>
     </div>
