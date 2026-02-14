@@ -416,6 +416,10 @@ def main() -> None:
     """CLI entry point for the Heimdall Windows Agent."""
     parser = argparse.ArgumentParser(description="Heimdall Windows Agent")
     parser.add_argument(
+        "--register", action="store_true",
+        help="Interaktive Geraeteregistrierung starten.",
+    )
+    parser.add_argument(
         "--service", action="store_true",
         help="Run as a Windows service (requires pywin32).",
     )
@@ -427,7 +431,10 @@ def main() -> None:
 
     _setup_logging(verbose=args.verbose)
 
-    if args.service:
+    if args.register:
+        from .register import register_interactive
+        register_interactive()
+    elif args.service:
         _run_as_service()
     else:
         _run_console()
