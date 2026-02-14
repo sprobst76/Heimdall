@@ -24,6 +24,7 @@ from app.schemas.quest import (
     QuestTemplateResponse,
     QuestTemplateUpdate,
 )
+from app.services.quest_scheduler import schedule_daily_quests
 from app.services.quest_service import (
     claim_quest,
     create_instances_for_child,
@@ -389,3 +390,24 @@ async def get_quest_stats(
     await _verify_child_access(db, child_id, current_user)
     stats = await get_child_quest_stats(db, child_id)
     return stats
+
+
+@router.post("/families/{family_id}/quests/schedule-today")
+async def schedule_quests_today(
+    family_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: User = Depends(require_parent),
+):
+    """Manually trigger quest scheduling for today. Requires parent role.
+
+    Creates quest instances for all recurring templates and children.
+    Skips templates that already have instances for today.
+    """
+    if current_user.family_id != family_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this family",
+        )
+
+    count = await schedule_daily_quests(db, family_id)
+    return {"created": count}

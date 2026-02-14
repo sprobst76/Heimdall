@@ -1,6 +1,8 @@
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,13 +23,40 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
 
 # ---------------------------------------------------------------------------
+# Quest Scheduler background task
+# ---------------------------------------------------------------------------
+async def _quest_scheduler_loop() -> None:
+    """Run quest scheduling at startup then daily at 00:05 UTC."""
+    from app.database import async_session
+    from app.services.quest_scheduler import schedule_daily_quests
+
+    while True:
+        try:
+            async with async_session() as db:
+                count = await schedule_daily_quests(db)
+                await db.commit()
+                logger.info("Quest scheduler: %d instances created", count)
+        except Exception:
+            logger.exception("Quest scheduler error")
+
+        # Sleep until tomorrow 00:05 UTC
+        now = datetime.now(timezone.utc)
+        tomorrow = (now + timedelta(days=1)).replace(
+            hour=0, minute=5, second=0, microsecond=0,
+        )
+        await asyncio.sleep((tomorrow - now).total_seconds())
+
+
+# ---------------------------------------------------------------------------
 # Lifespan context manager
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Application lifespan: runs on startup and shutdown."""
     logger.info("Heimdall API started")
+    scheduler_task = asyncio.create_task(_quest_scheduler_loop())
     yield
+    scheduler_task.cancel()
     logger.info("Heimdall API shutting down")
 
 
