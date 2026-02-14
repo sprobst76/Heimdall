@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.device import Device
 from app.models.usage import UsageEvent
+from app.models.user import User
 from app.schemas.agent import (
     HeartbeatRequest,
     HeartbeatResponse,
@@ -26,7 +27,7 @@ from app.schemas.agent import (
 from app.services.connection_manager import connection_manager
 from app.services.quest_service import check_auto_detect_quests
 from app.services.rule_engine import get_current_rules
-from app.services.rule_push_service import push_rules_to_child_devices
+from app.services.rule_push_service import notify_parent_dashboard, push_rules_to_child_devices
 
 router = APIRouter(prefix="/agent", tags=["Device Agent"])
 
@@ -97,11 +98,19 @@ async def report_usage_event(
     await db.flush()
     await db.refresh(event)
 
+    # Notify parent dashboard about usage update
+    child_result = await db.execute(select(User).where(User.id == device.child_id))
+    child = child_result.scalar_one_or_none()
+    if child:
+        await notify_parent_dashboard(child.family_id, child.id, "usage")
+
     # Check if any auto-detect quests are now satisfied
     if body.app_package and body.duration_seconds:
         approved = await check_auto_detect_quests(db, device.child_id, body.app_package)
         if approved:
             await push_rules_to_child_devices(db, device.child_id)
+            if child:
+                await notify_parent_dashboard(child.family_id, child.id, "quest_auto")
 
     return UsageEventResponse(id=event.id, status="recorded")
 
@@ -132,6 +141,7 @@ async def websocket_endpoint(
     """
     await websocket.accept()
     device = None
+    family_id = None
 
     try:
         # First message must be the device token for authentication
@@ -160,8 +170,18 @@ async def websocket_endpoint(
         device.last_seen = datetime.now(timezone.utc)
         await db.flush()
 
+        # Resolve family_id for parent notifications
+        child_result = await db.execute(select(User).where(User.id == device.child_id))
+        child_user = child_result.scalar_one_or_none()
+        if child_user:
+            family_id = child_user.family_id
+
         # Register connection for bidirectional push
         await connection_manager.connect(device.id, device.child_id, websocket)
+
+        # Notify parent portal about device coming online
+        if family_id:
+            await notify_parent_dashboard(family_id, device.child_id, "device_online")
 
         # Message loop
         while True:
@@ -194,12 +214,18 @@ async def websocket_endpoint(
                     db.add(event)
                     await db.flush()
 
+                    # Notify parent dashboard about usage
+                    if family_id:
+                        await notify_parent_dashboard(family_id, device.child_id, "usage")
+
                     # Check auto-detect quests
                     approved = await check_auto_detect_quests(
                         db, device.child_id, data["app_package"],
                     )
                     if approved:
                         await push_rules_to_child_devices(db, device.child_id)
+                        if family_id:
+                            await notify_parent_dashboard(family_id, device.child_id, "quest_auto")
 
                 await websocket.send_json({
                     "type": "ack",
@@ -227,3 +253,6 @@ async def websocket_endpoint(
     finally:
         if device is not None:
             await connection_manager.disconnect(device.id, device.child_id)
+            # Notify parent portal about device going offline
+            if family_id:
+                await notify_parent_dashboard(family_id, device.child_id, "device_offline")

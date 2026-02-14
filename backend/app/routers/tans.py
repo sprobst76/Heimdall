@@ -15,7 +15,7 @@ from app.database import get_db
 from app.models.tan import TAN
 from app.models.user import User
 from app.schemas.tan import TANCreate, TANRedeemRequest, TANResponse
-from app.services.rule_push_service import notify_tan_activated, push_rules_to_child_devices
+from app.services.rule_push_service import notify_parent_dashboard, notify_tan_activated, push_rules_to_child_devices
 from app.services.tan_service import generate_tan_code, redeem_tan, validate_tan_redemption
 
 router = APIRouter(prefix="/children/{child_id}/tans", tags=["TANs"])
@@ -119,7 +119,7 @@ async def redeem_tan_endpoint(
     current_user: User = Depends(get_current_user),
 ):
     """Redeem a TAN by code. Validates all policies."""
-    await _verify_child_access(db, child_id, current_user)
+    child_obj = await _verify_child_access(db, child_id, current_user)
 
     # Look up the TAN by code
     result = await db.execute(
@@ -149,6 +149,9 @@ async def redeem_tan_endpoint(
     )
     await push_rules_to_child_devices(db, child_id)
 
+    # Notify parent dashboard
+    await notify_parent_dashboard(child_obj.family_id, child_id, "tan_redeemed")
+
     return tan
 
 
@@ -160,7 +163,7 @@ async def invalidate_tan(
     current_user: User = Depends(require_parent),
 ):
     """Invalidate (expire) a TAN. Requires parent role."""
-    await _verify_child_access(db, child_id, current_user)
+    child_obj = await _verify_child_access(db, child_id, current_user)
 
     result = await db.execute(
         select(TAN).where(
@@ -179,4 +182,5 @@ async def invalidate_tan(
     tan.status = "expired"
     await db.flush()
     await push_rules_to_child_devices(db, child_id)
+    await notify_parent_dashboard(child_obj.family_id, child_id, "tan_invalidated")
     return None

@@ -10,7 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from app.config import settings
-from app.routers import agent, analytics, app_groups, auth, children, day_types, devices, families, llm, quests, tans, time_rules, uploads
+from app.routers import agent, analytics, app_groups, auth, children, day_types, devices, families, llm, portal_ws, quests, tans, time_rules, uploads
 
 logger = logging.getLogger(__name__)
 
@@ -79,3 +79,4 @@ app.include_router(uploads.router, prefix=settings.API_V1_PREFIX)
 app.include_router(llm.router, prefix=settings.API_V1_PREFIX)
 app.include_router(analytics.router, prefix=settings.API_V1_PREFIX)
 app.include_router(agent.router, prefix=settings.API_V1_PREFIX)
+app.include_router(portal_ws.router, prefix=settings.API_V1_PREFIX)

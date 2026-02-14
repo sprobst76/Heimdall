@@ -31,6 +31,7 @@ from app.services.quest_service import (
     review_quest,
     submit_proof,
 )
+from app.services.rule_push_service import notify_parent_dashboard
 
 router = APIRouter(tags=["Quests"])
 
@@ -325,7 +326,7 @@ async def submit_quest_proof(
     current_user: User = Depends(get_current_user),
 ):
     """Submit proof for a claimed quest."""
-    await _verify_child_access(db, child_id, current_user)
+    child_obj = await _verify_child_access(db, child_id, current_user)
 
     result = await db.execute(
         select(QuestInstance).where(
@@ -342,6 +343,7 @@ async def submit_quest_proof(
         )
 
     instance = await submit_proof(db, instance, body.proof_type, body.proof_url)
+    await notify_parent_dashboard(child_obj.family_id, child_id, "quest_proof")
     return instance
 
 
@@ -354,7 +356,7 @@ async def review_quest_endpoint(
     current_user: User = Depends(require_parent),
 ):
     """Parent reviews a submitted quest. On approval, generates a TAN."""
-    await _verify_child_access(db, child_id, current_user)
+    child_obj = await _verify_child_access(db, child_id, current_user)
 
     result = await db.execute(
         select(QuestInstance).where(
@@ -373,6 +375,7 @@ async def review_quest_endpoint(
     instance = await review_quest(
         db, instance, current_user.id, body.approved, body.feedback
     )
+    await notify_parent_dashboard(child_obj.family_id, child_id, "quest_reviewed")
     return instance
 
 

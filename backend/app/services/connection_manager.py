@@ -18,6 +18,7 @@ class ConnectionManager:
     def __init__(self) -> None:
         self._connections: dict[uuid.UUID, WebSocket] = {}
         self._child_devices: dict[uuid.UUID, set[uuid.UUID]] = {}
+        self._parent_connections: dict[uuid.UUID, set[WebSocket]] = {}  # family_id → WebSockets
         self._lock = asyncio.Lock()
 
     async def connect(
@@ -82,6 +83,46 @@ class ConnectionManager:
     async def get_connected_count(self, child_id: uuid.UUID) -> int:
         """Get count of connected devices for a child."""
         return len(self._child_devices.get(child_id, set()))
+
+    # -- Parent portal connections ------------------------------------------
+
+    async def connect_parent(
+        self, family_id: uuid.UUID, websocket: WebSocket
+    ) -> None:
+        """Register a parent portal WebSocket connection."""
+        async with self._lock:
+            if family_id not in self._parent_connections:
+                self._parent_connections[family_id] = set()
+            self._parent_connections[family_id].add(websocket)
+        logger.info("Parent connected for family %s", family_id)
+
+    async def disconnect_parent(
+        self, family_id: uuid.UUID, websocket: WebSocket
+    ) -> None:
+        """Remove a parent portal WebSocket connection."""
+        async with self._lock:
+            if family_id in self._parent_connections:
+                self._parent_connections[family_id].discard(websocket)
+                if not self._parent_connections[family_id]:
+                    del self._parent_connections[family_id]
+        logger.info("Parent disconnected for family %s", family_id)
+
+    async def notify_parents(
+        self, family_id: uuid.UUID, message: dict
+    ) -> int:
+        """Send a message to all connected parent portals of a family.
+
+        Returns the count of connections successfully notified.
+        """
+        sockets = self._parent_connections.get(family_id, set()).copy()
+        count = 0
+        for ws in sockets:
+            try:
+                await ws.send_json(message)
+                count += 1
+            except Exception:
+                logger.warning("Failed to send to parent portal for family %s", family_id)
+        return count
 
 
 # Singleton instance

@@ -2,6 +2,7 @@
 
 Helper functions to push updated rules to connected devices when parent
 makes changes to time rules, TANs, app groups, or device couplings.
+Also notifies parent portal WebSockets about dashboard invalidations.
 """
 
 import logging
@@ -76,3 +77,25 @@ async def notify_tan_activated(
         "expires_at": expires_at,
     }
     return await connection_manager.send_to_child_devices(child_id, message)
+
+
+async def notify_parent_dashboard(
+    family_id: uuid.UUID,
+    child_id: uuid.UUID | None = None,
+    event_type: str = "update",
+) -> int:
+    """Notify parent portal to invalidate dashboard data.
+
+    Sends TanStack Query key arrays so the frontend can call
+    ``queryClient.invalidateQueries()`` for each key.
+
+    Returns the count of parent connections notified.
+    """
+    keys: list[list[str]] = [
+        ["analytics", "family-dashboard", str(family_id)],
+    ]
+    if child_id is not None:
+        keys.append(["analytics", "child-dashboard", str(child_id)])
+
+    message = {"type": "invalidate", "keys": keys, "event": event_type}
+    return await connection_manager.notify_parents(family_id, message)

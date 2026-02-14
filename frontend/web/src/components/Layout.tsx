@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useLogout } from '../hooks/useAuth';
 import { useChildren } from '../hooks/useChildren';
+import { useDashboardWebSocket } from '../hooks/useWebSocket';
 
 const FAMILY_ID = 'demo';
 
@@ -27,6 +28,7 @@ export default function Layout() {
   const logout = useLogout();
   const navigate = useNavigate();
   const { data: children } = useChildren(FAMILY_ID);
+  const { isConnected } = useDashboardWebSocket();
 
   const navLinkClasses = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
@@ -199,7 +201,11 @@ export default function Layout() {
             Eltern-Portal
           </h1>
           <div className="flex items-center gap-3">
-            <div className="hidden text-sm text-slate-500 sm:block">
+            <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
+              <span
+                className={`inline-block h-2 w-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                title={isConnected ? 'Live-Verbindung aktiv' : 'Keine Live-Verbindung'}
+              />
               Heimdall Kinderschutz
             </div>
           </div>

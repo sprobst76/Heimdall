@@ -9,7 +9,7 @@ export function useFamilyDashboard(familyId: string) {
       const { data } = await api.get<FamilyDashboardStats>(`/analytics/family/${familyId}/dashboard`);
       return data;
     },
-    refetchInterval: 30_000,  // refresh every 30s for real-time feel
+    refetchInterval: 60_000,  // fallback polling; WebSocket handles real-time
   });
 }
 
@@ -20,7 +20,7 @@ export function useChildDashboard(childId: string) {
       const { data } = await api.get<ChildDashboardStats>(`/analytics/children/${childId}/dashboard`);
       return data;
     },
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   });
 }
 
