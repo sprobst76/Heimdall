@@ -82,6 +82,7 @@ class ProcessMonitor:
         self._config = config
         self._on_app_change = on_app_change
         self._current_session: AppSession | None = None
+        self._simulated_app: tuple[str, str, int] | None = None
 
     # -- Public helpers -----------------------------------------------------
 
@@ -90,16 +91,40 @@ class ProcessMonitor:
         """The currently tracked foreground app session."""
         return self._current_session
 
+    # -- Simulation (for remote control / testing) ---------------------------
+
+    def simulate_foreground(
+        self, executable: str, window_title: str = "Simulated Window",
+    ) -> None:
+        """Inject a fake foreground app for remote testing."""
+        self._simulated_app = (executable, window_title, 99999)
+        logger.info("Simulated foreground: %s", executable)
+
+    def clear_simulation(self) -> None:
+        """Clear the simulated foreground app."""
+        self._simulated_app = None
+        logger.info("Cleared foreground simulation")
+
     # -- Foreground detection -----------------------------------------------
 
-    @staticmethod
-    def get_foreground_app() -> tuple[str, str, int] | None:
+    def get_foreground_app(self) -> tuple[str, str, int] | None:
         """Return ``(executable_name, window_title, pid)`` of the foreground
         window, or ``None`` if detection fails.
+
+        If a simulated app has been set via :meth:`simulate_foreground`, that
+        value is returned instead of the real foreground window.
 
         On non-Windows platforms a dummy value is returned so the rest of the
         module can be exercised during development.
         """
+        if self._simulated_app is not None:
+            return self._simulated_app
+
+        return self._detect_foreground_real()
+
+    @staticmethod
+    def _detect_foreground_real() -> tuple[str, str, int] | None:
+        """Detect the real foreground window (platform-dependent)."""
         if not _HAS_WIN32:
             # Return a deterministic dummy for testing / dev on macOS / Linux.
             return ("dummy.exe", "Dummy Window", 0)
@@ -146,7 +171,7 @@ class ProcessMonitor:
         previously tracked session, and fires the *on_app_change* callback
         when a transition is detected.
         """
-        fg = self.get_foreground_app()
+        fg = self.get_foreground_app()  # uses simulation if active
 
         if fg is None:
             # Could not determine the foreground app -- if we had a session,

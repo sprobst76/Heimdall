@@ -9,10 +9,12 @@ Orchestrates every subsystem:
 * **OfflineCache** – queues events when the backend is unreachable
 * **TrayIcon** – system-tray presence for status & TAN entry
 
-Supports two run modes:
+Supports multiple run modes:
 
 1. **Console** (default) – ``python -m agent.main``
-2. **Windows Service** – ``python -m agent.main --service``
+2. **Demo** – ``python -m agent.main --demo`` (no backend required)
+3. **Demo + Remote** – ``python -m agent.main --demo --remote-control``
+4. **Windows Service** – ``python -m agent.main --service``
 """
 
 from __future__ import annotations
@@ -44,17 +46,34 @@ log = logging.getLogger("heimdall")
 class HeimdallAgent:
     """Central coordinator that wires all subsystems together."""
 
-    def __init__(self, config: AgentConfig) -> None:
+    def __init__(
+        self,
+        config: AgentConfig,
+        *,
+        demo_mode: bool = False,
+        remote_control: bool = False,
+        remote_port: int = 9876,
+    ) -> None:
         self._config = config
+        self._demo_mode = demo_mode
 
-        # Subsystems
-        self._rest = RestClient(config)
-        self._cache = OfflineCache()
+        # Core subsystems (always needed)
         self._blocker = AppBlocker(config)
         self._overlay = BlockingOverlay(config)
         self._tray = TrayIcon(config)
         self._monitor = ProcessMonitor(config, on_app_change=self._on_app_change)
-        self._ws = WsClient(config, on_message=self._on_ws_message)
+
+        # Backend subsystems (skipped in demo mode)
+        if not demo_mode:
+            self._rest = RestClient(config)
+            self._cache = OfflineCache()
+            self._ws = WsClient(config, on_message=self._on_ws_message)
+
+        # Remote control server (optional)
+        self._remote = None
+        if remote_control:
+            from .remote_control import RemoteControlServer
+            self._remote = RemoteControlServer(port=remote_port, agent=self)
 
         # State
         self._rules: dict[str, Any] = {}
@@ -73,17 +92,23 @@ class HeimdallAgent:
 
     async def start(self) -> None:
         """Start all subsystems and run until stopped."""
-        log.info("Heimdall Agent v0.1.0 starting …")
+        mode = "DEMO MODE" if self._demo_mode else "normal mode"
+        log.info("Heimdall Agent v0.1.0 starting (%s) …", mode)
 
-        if not self._config.is_registered:
+        if not self._demo_mode and not self._config.is_registered:
             log.error(
                 "Agent is not registered (no device_token). "
                 "Run registration first or set HEIMDALL_DEVICE_TOKEN."
             )
             return
 
-        # Initial rule fetch (REST fallback)
-        await self._fetch_and_cache_rules()
+        # Initial rules
+        if self._demo_mode:
+            from .demo import get_demo_rules
+            self._apply_rules(get_demo_rules())
+            log.info("Demo rules applied.")
+        else:
+            await self._fetch_and_cache_rules()
 
         # Start tray icon in a dedicated thread (it blocks)
         tray_thread = threading.Thread(
@@ -91,15 +116,24 @@ class HeimdallAgent:
         )
         tray_thread.start()
 
-        # Launch concurrent tasks
+        # Launch concurrent tasks — only core tasks in demo mode
         tasks = [
             asyncio.create_task(self._monitor.run(self._stop_event), name="monitor"),
-            asyncio.create_task(self._ws.run(), name="websocket"),
-            asyncio.create_task(self._heartbeat_loop(), name="heartbeat"),
-            asyncio.create_task(self._rule_poll_loop(), name="rule-poll"),
-            asyncio.create_task(self._sync_loop(), name="sync"),
             asyncio.create_task(self._enforce_loop(), name="enforce"),
         ]
+
+        if not self._demo_mode:
+            tasks.extend([
+                asyncio.create_task(self._ws.run(), name="websocket"),
+                asyncio.create_task(self._heartbeat_loop(), name="heartbeat"),
+                asyncio.create_task(self._rule_poll_loop(), name="rule-poll"),
+                asyncio.create_task(self._sync_loop(), name="sync"),
+            ])
+
+        if self._remote is not None:
+            tasks.append(
+                asyncio.create_task(self._remote.run(), name="remote-control"),
+            )
 
         log.info("All subsystems started.")
         self._tray.update_status("connected")
@@ -113,8 +147,9 @@ class HeimdallAgent:
             t.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
 
-        await self._rest.close()
-        await self._ws.disconnect()
+        if not self._demo_mode:
+            await self._rest.close()
+            await self._ws.disconnect()
         self._tray.stop()
         log.info("Heimdall Agent stopped.")
 
@@ -133,6 +168,13 @@ class HeimdallAgent:
         new_session: AppSession | None,
     ) -> None:
         """Called by the monitor when the foreground app changes."""
+        if self._demo_mode:
+            # In demo mode, just log — no backend to report to
+            old_name = old_session.executable if old_session else None
+            new_name = new_session.executable if new_session else None
+            log.debug("Demo app change: %s -> %s", old_name, new_name)
+            return
+
         now = datetime.now(timezone.utc)
 
         # Report the ended session
@@ -420,6 +462,18 @@ def main() -> None:
         help="Interaktive Geraeteregistrierung starten.",
     )
     parser.add_argument(
+        "--demo", action="store_true",
+        help="Demo-Modus ohne Backend (fest verdrahtete Regeln).",
+    )
+    parser.add_argument(
+        "--remote-control", action="store_true",
+        help="HTTP-Fernbedienung aktivieren (default: Port 9876).",
+    )
+    parser.add_argument(
+        "--remote-port", type=int, default=9876,
+        help="Port fuer die Fernbedienung (default: 9876).",
+    )
+    parser.add_argument(
         "--service", action="store_true",
         help="Run as a Windows service (requires pywin32).",
     )
@@ -434,17 +488,55 @@ def main() -> None:
     if args.register:
         from .register import register_interactive
         register_interactive()
+    elif args.demo:
+        _run_demo(
+            remote_control=args.remote_control,
+            remote_port=args.remote_port,
+            verbose=args.verbose,
+        )
     elif args.service:
         _run_as_service()
     else:
-        _run_console()
+        _run_console(
+            remote_control=args.remote_control,
+            remote_port=args.remote_port,
+        )
 
 
-def _run_console() -> None:
+def _run_console(
+    remote_control: bool = False,
+    remote_port: int = 9876,
+) -> None:
     """Run the agent in console (foreground) mode."""
     config = AgentConfig.load()
-    agent = HeimdallAgent(config)
+    agent = HeimdallAgent(
+        config,
+        remote_control=remote_control,
+        remote_port=remote_port,
+    )
+    _run_agent_loop(agent)
 
+
+def _run_demo(
+    remote_control: bool = False,
+    remote_port: int = 9876,
+    verbose: bool = False,
+) -> None:
+    """Run the agent in demo mode (no backend required)."""
+    from .demo import create_demo_config
+
+    config = create_demo_config()
+    agent = HeimdallAgent(
+        config,
+        demo_mode=True,
+        remote_control=remote_control,
+        remote_port=remote_port,
+    )
+    _run_agent_loop(agent)
+
+
+def _run_agent_loop(agent: HeimdallAgent) -> None:
+    """Common event-loop setup for console and demo mode."""
     loop = asyncio.new_event_loop()
 
     # Handle Ctrl-C gracefully

@@ -1,0 +1,50 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Agent: Demo + Fernbedienung",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "agent.main",
+      "args": ["--demo", "--remote-control", "-v"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Agent: Demo-Modus",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "agent.main",
+      "args": ["--demo", "-v"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Agent: Normal + Fernbedienung",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "agent.main",
+      "args": ["--remote-control", "-v"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Agent: Registrierung",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "agent.main",
+      "args": ["--register"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["tests/", "-v"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

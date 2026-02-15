@@ -13,12 +13,30 @@ from agent.monitor import AppSession, ProcessMonitor
 
 def test_get_foreground_app_dummy() -> None:
     """On non-Windows platforms the dummy fallback returns a stable tuple."""
-    result = ProcessMonitor.get_foreground_app()
+    cfg = AgentConfig()
+    monitor = ProcessMonitor(cfg, on_app_change=AsyncMock())
+    result = monitor.get_foreground_app()
     assert result is not None
     exe, title, pid = result
     assert exe == "dummy.exe"
     assert isinstance(title, str)
     assert isinstance(pid, int)
+
+
+def test_simulate_foreground() -> None:
+    """simulate_foreground overrides get_foreground_app."""
+    cfg = AgentConfig()
+    monitor = ProcessMonitor(cfg, on_app_change=AsyncMock())
+
+    monitor.simulate_foreground("notepad.exe", "Test")
+    result = monitor.get_foreground_app()
+    assert result is not None
+    assert result[0] == "notepad.exe"
+
+    monitor.clear_simulation()
+    result = monitor.get_foreground_app()
+    assert result is not None
+    assert result[0] == "dummy.exe"  # back to dummy on Linux
 
 
 def test_map_to_group() -> None:

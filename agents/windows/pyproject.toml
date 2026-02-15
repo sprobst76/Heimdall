@@ -10,6 +10,7 @@ dependencies = [
     "pystray>=0.19.5",
     "Pillow>=10.0.0",
     "pywin32>=306; sys_platform == 'win32'",
+    "aiohttp>=3.9.0",
 ]
 
 [project.optional-dependencies]
