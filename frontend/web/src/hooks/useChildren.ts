@@ -9,6 +9,7 @@ export function useChildren(familyId: string) {
       const { data } = await api.get<User[]>(`/families/${familyId}/children`);
       return data;
     },
+    enabled: !!familyId,
   });
 }
 
@@ -19,6 +20,7 @@ export function useChild(familyId: string, childId: string) {
       const { data } = await api.get<User>(`/families/${familyId}/children/${childId}`);
       return data;
     },
+    enabled: !!familyId && !!childId,
   });
 }
 
