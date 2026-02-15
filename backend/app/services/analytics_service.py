@@ -4,7 +4,7 @@ import uuid
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 
-from sqlalchemy import select, func, and_, extract
+from sqlalchemy import select, func, and_, extract, literal_column
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.app_group import AppGroup
@@ -486,9 +486,10 @@ async def _build_weekly_trends(
     """Aggregate totals per ISO week within the range."""
 
     # Usage per week
+    week_trunc = func.date_trunc(literal_column("'week'"), UsageEvent.started_at)
     usage_q = (
         select(
-            func.date_trunc("week", UsageEvent.started_at).label("week"),
+            week_trunc.label("week"),
             func.coalesce(func.sum(UsageEvent.duration_seconds), 0).label("seconds"),
         )
         .where(
@@ -498,8 +499,8 @@ async def _build_weekly_trends(
                 UsageEvent.started_at < range_end,
             ),
         )
-        .group_by(func.date_trunc("week", UsageEvent.started_at))
-        .order_by(func.date_trunc("week", UsageEvent.started_at))
+        .group_by(week_trunc)
+        .order_by(week_trunc)
     )
     usage_result = await db.execute(usage_q)
     usage_weeks: dict[date, int] = {}
@@ -508,9 +509,10 @@ async def _build_weekly_trends(
         usage_weeks[week_date] = row.seconds
 
     # Quests per week
+    quest_week_trunc = func.date_trunc(literal_column("'week'"), QuestInstance.reviewed_at)
     quests_q = (
         select(
-            func.date_trunc("week", QuestInstance.reviewed_at).label("week"),
+            quest_week_trunc.label("week"),
             func.count().label("cnt"),
         )
         .where(
@@ -521,7 +523,7 @@ async def _build_weekly_trends(
                 QuestInstance.reviewed_at < range_end,
             ),
         )
-        .group_by(func.date_trunc("week", QuestInstance.reviewed_at))
+        .group_by(quest_week_trunc)
     )
     quests_result = await db.execute(quests_q)
     quests_weeks: dict[date, int] = {}
@@ -530,9 +532,10 @@ async def _build_weekly_trends(
         quests_weeks[week_date] = row.cnt
 
     # TANs redeemed per week
+    tan_week_trunc = func.date_trunc(literal_column("'week'"), TAN.redeemed_at)
     tans_q = (
         select(
-            func.date_trunc("week", TAN.redeemed_at).label("week"),
+            tan_week_trunc.label("week"),
             func.count().label("cnt"),
         )
         .where(
@@ -543,7 +546,7 @@ async def _build_weekly_trends(
                 TAN.redeemed_at < range_end,
             ),
         )
-        .group_by(func.date_trunc("week", TAN.redeemed_at))
+        .group_by(tan_week_trunc)
     )
     tans_result = await db.execute(tans_q)
     tans_weeks: dict[date, int] = {}
