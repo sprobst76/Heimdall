@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { useChildren } from '../hooks/useChildren';
 import { useFamilyDashboard, useChildDashboard } from '../hooks/useAnalytics';
-import type { User, ChildDashboardStats } from '../types';
+import type { User } from '../types';
 
 const FAMILY_ID = 'demo';
 

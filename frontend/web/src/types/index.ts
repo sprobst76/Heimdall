@@ -262,6 +262,7 @@ export interface QuestTemplateCreate {
   recurrence: string;
   auto_detect_app?: string | null;
   auto_detect_minutes?: number | null;
+  streak_threshold?: number | null;
 }
 
 export interface QuestTemplateUpdate {

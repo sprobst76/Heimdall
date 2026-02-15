@@ -72,7 +72,7 @@ export default function AIAssistantPage() {
 
   async function handleAdoptRule() {
     if (!parsedResult?.rule) return;
-    const r = parsedResult.rule;
+    const r = parsedResult.rule as Record<string, unknown>;
     try {
       await createRule.mutateAsync({
         name: (r.name as string) || 'KI-Regel',
@@ -146,7 +146,14 @@ export default function AIAssistantPage() {
       );
     }
 
-    const r = parsedResult.rule;
+    const r = parsedResult.rule as {
+      name?: string;
+      day_types?: string[];
+      time_windows?: Array<{ start: string; end: string }>;
+      daily_limit_minutes?: number;
+      group_limits?: Array<{ group_id: string; max_minutes: number }>;
+      explanation?: string;
+    };
 
     return (
       <div className="mt-4 space-y-3">
@@ -160,12 +167,12 @@ export default function AIAssistantPage() {
 
           <div className="space-y-2 text-sm text-slate-700">
             {/* Name */}
-            {r.name && (
+            {r.name ? (
               <div className="flex gap-2">
                 <span className="font-medium text-slate-500">Name:</span>
-                <span>{r.name as string}</span>
+                <span>{String(r.name)}</span>
               </div>
-            )}
+            ) : null}
 
             {/* Day types */}
             {Array.isArray(r.day_types) && (r.day_types as string[]).length > 0 && (

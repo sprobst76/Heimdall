@@ -246,8 +246,8 @@ export default function AnalyticsPage() {
                     cx="50%"
                     cy="50%"
                     outerRadius={110}
-                    label={({ group_name, percentage }) =>
-                      `${group_name} (${percentage.toFixed(0)}%)`
+                    label={({ name, percent }: { name?: string; percent?: number }) =>
+                      `${name ?? ''} (${((percent ?? 0) * 100).toFixed(0)}%)`
                     }
                   >
                     {data.group_breakdown.map((_, idx) => (
@@ -255,7 +255,7 @@ export default function AnalyticsPage() {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number) => [`${value} Min.`, 'Minuten']}
+                    formatter={(value: number | undefined) => [`${value ?? 0} Min.`, 'Minuten']}
                   />
                   <Legend />
                 </PieChart>
@@ -276,7 +276,7 @@ export default function AnalyticsPage() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                   <YAxis unit=" Min" tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(v: number) => [`${v} Min.`, 'Nutzung']} />
+                  <Tooltip formatter={(v: number | undefined) => [`${v ?? 0} Min.`, 'Nutzung']} />
                   <Bar dataKey="Minuten" fill="#6366f1" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
