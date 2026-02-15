@@ -91,6 +91,9 @@ Desktop.ini
 # ===== Docker =====
 docker-compose.override.yml
 
+# ===== Local Docs (not for GitHub) =====
+docs/local/
+
 # ===== Misc =====
 *.log
 *.tmp
