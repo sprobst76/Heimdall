@@ -1,0 +1,107 @@
+# Heimdall Backend - Docker Compose
+# Location: /srv/heimdall/backend/docker-compose.yml
+# Nutzt bestehendes ai-lab Netzwerk für Traefik
+
+networks:
+  ai-lab_ai-lab:
+    external: true
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: heimdall-postgres
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+    networks:
+      - ai-lab_ai-lab
+    environment:
+      - TZ=${TZ:-Europe/Berlin}
+      - POSTGRES_USER=heimdall
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?ENV_VAR_REQUIRED}
+      - POSTGRES_DB=heimdall
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U heimdall"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: heimdall-redis
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    networks:
+      - ai-lab_ai-lab
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    image: heimdall-api:latest
+    container_name: heimdall-api
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+    networks:
+      - ai-lab_ai-lab
+    environment:
+      - TZ=${TZ:-Europe/Berlin}
+      - DATABASE_URL=postgresql+asyncpg://heimdall:${POSTGRES_PASSWORD}@heimdall-postgres:5432/heimdall
+      - REDIS_URL=redis://heimdall-redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:?ENV_VAR_REQUIRED}
+      - CORS_ORIGINS=${CORS_ORIGINS:-["https://heimdall.lab.${DOMAIN}"]}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - HOLIDAY_COUNTRY=DE
+      - HOLIDAY_SUBDIVISION=DE-BW
+    volumes:
+      - ./data/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.heimdall.rule=Host(`heimdall.lab.${DOMAIN}`)"
+      - "traefik.http.routers.heimdall.entrypoints=websecure"
+      - "traefik.http.routers.heimdall.tls.certresolver=cloudflare"
+      - "traefik.http.routers.heimdall.middlewares=security-headers@file,rate-limit-standard@file"
+      - "traefik.http.services.heimdall.loadbalancer.server.port=8000"
