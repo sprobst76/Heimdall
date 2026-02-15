@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../main.dart';
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -14,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _loading = false;
+  bool _demoMode = false;
   String? _error;
 
   @override
@@ -24,6 +26,12 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
+    // Im Demo-Modus: App mit MockApiService komplett neu aufbauen
+    if (_demoMode) {
+      HeimdallRoot.startDemoMode();
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -150,10 +158,33 @@ class _LoginScreenState extends State<LoginScreen> {
                                   color: Colors.white,
                                 ),
                               )
-                            : const Text(
-                                'Anmelden',
-                                style: TextStyle(fontSize: 16),
+                            : Text(
+                                _demoMode ? 'Demo starten' : 'Anmelden',
+                                style: const TextStyle(fontSize: 16),
                               ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.science_outlined,
+                            size: 18,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Demo-Modus',
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Switch(
+                            value: _demoMode,
+                            onChanged: (v) => setState(() => _demoMode = v),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -166,3 +197,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+

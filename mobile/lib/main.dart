@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
+import 'services/mock_api_service.dart';
 import 'services/agent_bridge.dart';
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
@@ -15,15 +16,69 @@ void main() {
     AgentBridge.initialize();
   }
 
-  runApp(const HeimdallChildApp());
+  runApp(const HeimdallRoot());
 }
 
-class HeimdallChildApp extends StatelessWidget {
-  const HeimdallChildApp({super.key});
+/// Root-Widget das bei Demo-Modus-Wechsel die gesamte App neu aufbaut.
+class HeimdallRoot extends StatefulWidget {
+  const HeimdallRoot({super.key});
+
+  static _HeimdallRootState? _instance;
+
+  /// Aktiviert den Demo-Modus und baut die App komplett neu auf.
+  static void startDemoMode() {
+    _instance?._enableDemoMode();
+  }
+
+  @override
+  State<HeimdallRoot> createState() => _HeimdallRootState();
+}
+
+class _HeimdallRootState extends State<HeimdallRoot> {
+  bool _emulatorMode = false;
+  bool _autoLogin = false;
+  int _rebuildKey = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    HeimdallRoot._instance = this;
+  }
+
+  void _enableDemoMode() {
+    setState(() {
+      _emulatorMode = true;
+      _autoLogin = true;
+      _rebuildKey++;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final apiService = ApiService();
+    return HeimdallChildApp(
+      key: ValueKey(_rebuildKey),
+      emulatorMode: _emulatorMode,
+      autoLogin: _autoLogin,
+      onAutoLoginDone: () => _autoLogin = false,
+    );
+  }
+}
+
+class HeimdallChildApp extends StatelessWidget {
+  final bool emulatorMode;
+  final bool autoLogin;
+  final VoidCallback? onAutoLoginDone;
+
+  const HeimdallChildApp({
+    super.key,
+    this.emulatorMode = false,
+    this.autoLogin = false,
+    this.onAutoLoginDone,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final apiService = emulatorMode ? MockApiService() : ApiService();
 
     return MultiProvider(
       providers: [
@@ -48,14 +103,24 @@ class HeimdallChildApp extends StatelessWidget {
           ),
           useMaterial3: true,
         ),
-        home: const AuthGate(),
+        home: AuthGate(
+          autoLogin: autoLogin,
+          onAutoLoginDone: onAutoLoginDone,
+        ),
       ),
     );
   }
 }
 
 class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
+  final bool autoLogin;
+  final VoidCallback? onAutoLoginDone;
+
+  const AuthGate({
+    super.key,
+    this.autoLogin = false,
+    this.onAutoLoginDone,
+  });
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -65,8 +130,14 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AuthProvider>().checkAuth();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (widget.autoLogin) {
+        widget.onAutoLoginDone?.call();
+        final auth = context.read<AuthProvider>();
+        await auth.login('demo@heimdall.de', 'demo');
+      } else {
+        context.read<AuthProvider>().checkAuth();
+      }
     });
   }
 

@@ -22,8 +22,14 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> login(String email, String password) async {
     try {
-      await _api.login(email, password);
+      final data = await _api.login(email, password);
       _isLoggedIn = true;
+      // Setze Kind-Info falls im Response enthalten (z.B. Demo-Modus)
+      if (data.containsKey('child_id')) {
+        _childId = data['child_id'];
+        _familyId = data['family_id'];
+        _childName = data['name'];
+      }
       notifyListeners();
       return true;
     } catch (e) {
