@@ -44,6 +44,10 @@ class AppMonitorService : Service() {
         instance = this
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification())
+        // Register for instant A11y notifications (much faster than polling)
+        HeimdallAccessibilityService.onAppChanged = { pkg ->
+            handleForegroundChange(pkg)
+        }
         startMonitoring()
         Log.i(TAG, "Monitor service created")
     }
@@ -57,6 +61,7 @@ class AppMonitorService : Service() {
     override fun onDestroy() {
         monitorJob?.cancel()
         scope.cancel()
+        HeimdallAccessibilityService.onAppChanged = null
         instance = null
         super.onDestroy()
         Log.i(TAG, "Monitor service destroyed")
@@ -90,30 +95,46 @@ class AppMonitorService : Service() {
             .build()
     }
 
+    /**
+     * Called both from A11y callback (instant) and from polling (fallback).
+     * Handles session tracking and blocking logic.
+     */
+    fun handleForegroundChange(pkg: String) {
+        if (pkg == currentForegroundPackage) return
+        // Ignore our own package — overlay triggers A11y events
+        if (pkg == packageName) return
+
+        val oldPkg = currentForegroundPackage
+        // Close old session
+        if (sessionPackage.isNotEmpty()) {
+            recordSessionEnd()
+        }
+        // Start new session
+        currentForegroundPackage = pkg
+        sessionPackage = pkg
+        sessionStart = System.currentTimeMillis()
+
+        Log.d(TAG, "Foreground: $oldPkg -> $pkg")
+        onAppChanged?.invoke(oldPkg, pkg)
+
+        // Check if blocked
+        val groupId = appGroupMap[pkg]
+        if (groupId != null && blockedGroups.contains(groupId)) {
+            Log.i(TAG, "Blocked app detected: $pkg (group: $groupId)")
+            onBlockTriggered?.invoke(pkg, groupId)
+            showBlockingOverlay(pkg, groupId)
+        } else {
+            hideBlockingOverlay()
+        }
+    }
+
     private fun startMonitoring() {
         monitorJob = scope.launch {
             while (isActive) {
+                // Polling as fallback — primary detection is via A11y callback
                 val pkg = detectForegroundApp()
-                if (pkg != null && pkg != currentForegroundPackage) {
-                    val oldPkg = currentForegroundPackage
-                    // Close old session
-                    if (sessionPackage.isNotEmpty()) {
-                        recordSessionEnd()
-                    }
-                    // Start new session
-                    currentForegroundPackage = pkg
-                    sessionPackage = pkg
-                    sessionStart = System.currentTimeMillis()
-
-                    Log.d(TAG, "Foreground: $oldPkg -> $pkg")
-                    onAppChanged?.invoke(oldPkg, pkg)
-
-                    // Check if blocked
-                    val groupId = appGroupMap[pkg]
-                    if (groupId != null && blockedGroups.contains(groupId)) {
-                        Log.i(TAG, "Blocked app detected: $pkg (group: $groupId)")
-                        onBlockTriggered?.invoke(pkg, groupId)
-                    }
+                if (pkg != null) {
+                    handleForegroundChange(pkg)
                 }
                 delay(POLL_INTERVAL_MS)
             }
@@ -152,5 +173,17 @@ class AppMonitorService : Service() {
 
     fun resetDailyUsage() {
         usageByGroup.clear()
+    }
+
+    private fun showBlockingOverlay(packageName: String, groupId: String) {
+        val intent = Intent(this, BlockingOverlayService::class.java).apply {
+            putExtra("packageName", packageName)
+            putExtra("groupId", groupId)
+        }
+        startService(intent)
+    }
+
+    private fun hideBlockingOverlay() {
+        BlockingOverlayService.instance?.hideBlock()
     }
 }

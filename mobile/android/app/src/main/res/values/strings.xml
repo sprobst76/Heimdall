@@ -7,4 +7,7 @@
     <string name="monitor_notification_text">Bildschirmzeit wird überwacht</string>
     <string name="monitor_channel_name">Heimdall Überwachung</string>
     <string name="monitor_channel_description">Benachrichtigung für den Heimdall Überwachungsdienst</string>
+    <string name="block_overlay_title">App gesperrt</string>
+    <string name="block_overlay_message">Diese App ist gerade nicht erlaubt.</string>
+    <string name="block_overlay_button">Zurück zu Heimdall</string>
 </resources>

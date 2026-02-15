@@ -126,11 +126,37 @@ class MethodChannelHandler(
             "blockGroup" -> {
                 val groupId = call.argument<String>("groupId") ?: ""
                 AppMonitorService.instance?.blockedGroups?.add(groupId)
+                // Check if current foreground app is in this group → show overlay immediately
+                val currentPkg = HeimdallAccessibilityService.currentPackage
+                val currentGroup = AppMonitorService.instance?.appGroupMap?.get(currentPkg)
+                if (currentGroup == groupId) {
+                    val intent = Intent(context, BlockingOverlayService::class.java).apply {
+                        putExtra("packageName", currentPkg)
+                        putExtra("groupId", groupId)
+                    }
+                    context.startService(intent)
+                }
                 result.success(true)
             }
             "unblockGroup" -> {
                 val groupId = call.argument<String>("groupId") ?: ""
                 AppMonitorService.instance?.blockedGroups?.remove(groupId)
+                // Hide overlay if the currently blocked app belongs to this group
+                BlockingOverlayService.instance?.hideBlock()
+                result.success(true)
+            }
+            "showBlockOverlay" -> {
+                val packageName = call.argument<String>("packageName") ?: ""
+                val groupId = call.argument<String>("groupId") ?: ""
+                val intent = Intent(context, BlockingOverlayService::class.java).apply {
+                    putExtra("packageName", packageName)
+                    putExtra("groupId", groupId)
+                }
+                context.startService(intent)
+                result.success(true)
+            }
+            "hideBlockOverlay" -> {
+                BlockingOverlayService.instance?.hideBlock()
                 result.success(true)
             }
             "isMonitoringActive" -> {

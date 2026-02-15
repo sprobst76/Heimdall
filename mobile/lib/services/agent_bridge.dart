@@ -105,4 +105,17 @@ class AgentBridge {
   static Future<void> updateAppGroupMap(Map<String, String> map) async {
     await _channel.invokeMethod('updateAppGroupMap', {'map': map});
   }
+
+  // -- Blocking overlay --
+
+  static Future<void> showBlockOverlay(String packageName, String groupId) async {
+    await _channel.invokeMethod('showBlockOverlay', {
+      'packageName': packageName,
+      'groupId': groupId,
+    });
+  }
+
+  static Future<void> hideBlockOverlay() async {
+    await _channel.invokeMethod('hideBlockOverlay');
+  }
 }

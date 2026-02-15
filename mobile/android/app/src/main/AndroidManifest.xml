@@ -55,6 +55,11 @@
             android:exported="false"
             android:foregroundServiceType="specialUse" />
 
+        <!-- Blocking overlay service -->
+        <service
+            android:name=".agent.BlockingOverlayService"
+            android:exported="false" />
+
         <!-- Device Admin Receiver for uninstall protection -->
         <receiver
             android:name=".agent.HeimdallDeviceAdminReceiver"
