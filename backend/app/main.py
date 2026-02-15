@@ -67,10 +67,18 @@ app = FastAPI(
     title=settings.APP_NAME,
     version="0.1.0",
     lifespan=lifespan,
-    redirect_slashes=False,
 )
 
+
 # -- Middleware ---------------------------------------------------------------
+@app.middleware("http")
+async def fix_redirect_scheme(request: Request, call_next):
+    """Ensure redirects use https when behind a TLS-terminating reverse proxy."""
+    if request.headers.get("x-forwarded-proto") == "https":
+        request.scope["scheme"] = "https"
+    return await call_next(request)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
