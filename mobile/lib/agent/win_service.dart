@@ -56,13 +56,13 @@ List<GroupLimit> createDemoRules() => [
         appGroupId: 'gaming',
         groupName: 'Spiele',
         limitMinutes: 60,
-        usedMinutes: 45, // 15 min left → warning
+        usedMinutes: 60, // limit reached → blocked
       ),
       GroupLimit(
         appGroupId: 'browser',
         groupName: 'Browser',
         limitMinutes: 30,
-        usedMinutes: 10,
+        usedMinutes: 30, // limit reached → blocked
       ),
       GroupLimit(
         appGroupId: 'streaming',
