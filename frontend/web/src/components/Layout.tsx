@@ -17,18 +17,17 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
-import { useLogout } from '../hooks/useAuth';
+import { useLogout, useFamilyId } from '../hooks/useAuth';
 import { useChildren } from '../hooks/useChildren';
 import { useDashboardWebSocket } from '../hooks/useWebSocket';
-
-const FAMILY_ID = 'demo';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [childrenExpanded, setChildrenExpanded] = useState(true);
   const logout = useLogout();
   const navigate = useNavigate();
-  const { data: children } = useChildren(FAMILY_ID);
+  const familyId = useFamilyId();
+  const { data: children } = useChildren(familyId);
   const { isConnected } = useDashboardWebSocket();
 
   const navLinkClasses = ({ isActive }: { isActive: boolean }) =>

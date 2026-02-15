@@ -25,14 +25,13 @@ import {
   useAssignQuest,
   useReviewQuest,
 } from '../hooks/useQuests';
+import { useFamilyId } from '../hooks/useAuth';
 import type {
   QuestTemplate,
   QuestTemplateCreate,
   QuestInstance,
   QuestReview,
 } from '../types';
-
-const FAMILY_ID = 'demo';
 
 const CATEGORY_OPTIONS = [
   { value: 'Haushalt', label: 'Haushalt' },
@@ -89,7 +88,8 @@ function recurrenceLabel(r: string): string {
 
 export default function QuestsPage() {
   const { childId } = useParams<{ childId: string }>();
-  const { data: children } = useChildren(FAMILY_ID);
+  const familyId = useFamilyId();
+  const { data: children } = useChildren(familyId);
   const child = children?.find((c) => c.id === childId);
 
   const {
@@ -97,7 +97,7 @@ export default function QuestsPage() {
     isLoading: templatesLoading,
     isError: templatesError,
     error: templatesErr,
-  } = useQuestTemplates(FAMILY_ID);
+  } = useQuestTemplates(familyId);
   const {
     data: instances,
     isLoading: instancesLoading,
@@ -105,9 +105,9 @@ export default function QuestsPage() {
     error: instancesErr,
   } = useChildQuests(childId ?? '');
 
-  const createTemplate = useCreateQuestTemplate(FAMILY_ID);
-  const updateTemplate = useUpdateQuestTemplate(FAMILY_ID);
-  const deleteTemplate = useDeleteQuestTemplate(FAMILY_ID);
+  const createTemplate = useCreateQuestTemplate(familyId);
+  const updateTemplate = useUpdateQuestTemplate(familyId);
+  const deleteTemplate = useDeleteQuestTemplate(familyId);
   const assignQuest = useAssignQuest(childId ?? '');
   const reviewQuest = useReviewQuest(childId ?? '');
 

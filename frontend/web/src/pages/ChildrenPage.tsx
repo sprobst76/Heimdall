@@ -18,16 +18,16 @@ import {
   useUpdateChild,
   useDeleteChild,
 } from '../hooks/useChildren';
+import { useFamilyId } from '../hooks/useAuth';
 import type { User, ChildCreate } from '../types';
-
-const FAMILY_ID = 'demo';
 
 export default function ChildrenPage() {
   const navigate = useNavigate();
-  const { data: children, isLoading, isError, error } = useChildren(FAMILY_ID);
-  const createChild = useCreateChild(FAMILY_ID);
-  const updateChild = useUpdateChild(FAMILY_ID);
-  const deleteChild = useDeleteChild(FAMILY_ID);
+  const familyId = useFamilyId();
+  const { data: children, isLoading, isError, error } = useChildren(familyId);
+  const createChild = useCreateChild(familyId);
+  const updateChild = useUpdateChild(familyId);
+  const deleteChild = useDeleteChild(familyId);
 
   const [showForm, setShowForm] = useState(false);
   const [editingChild, setEditingChild] = useState<User | null>(null);

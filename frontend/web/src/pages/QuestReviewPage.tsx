@@ -17,9 +17,8 @@ import {
   useChildQuests,
   useReviewQuest,
 } from '../hooks/useQuests';
+import { useFamilyId } from '../hooks/useAuth';
 import type { QuestInstance, QuestReview, QuestTemplate, User } from '../types';
-
-const FAMILY_ID = 'demo';
 
 function ChildReviewSection({
   child,
@@ -319,13 +318,14 @@ function ChildReviewSection({
 }
 
 export default function QuestReviewPage() {
+  const familyId = useFamilyId();
   const {
     data: children,
     isLoading: childrenLoading,
     isError: childrenError,
     error: childrenErr,
-  } = useChildren(FAMILY_ID);
-  const { data: templates } = useQuestTemplates(FAMILY_ID);
+  } = useChildren(familyId);
+  const { data: templates } = useQuestTemplates(familyId);
 
   const [pendingCounts, setPendingCounts] = useState<Record<string, number>>(
     {}

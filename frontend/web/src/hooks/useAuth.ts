@@ -1,6 +1,6 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/client';
-import type { LoginRequest, RegisterRequest, TokenResponse } from '../types';
+import type { LoginRequest, RegisterRequest, TokenResponse, User } from '../types';
 
 export function useLogin() {
   return useMutation({
@@ -34,6 +34,23 @@ export function useLogout() {
     queryClient.clear();
     window.location.href = '/login';
   };
+}
+
+export function useCurrentUser() {
+  return useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: async () => {
+      const res = await api.get<User>('/auth/me');
+      return res.data;
+    },
+    enabled: !!localStorage.getItem('access_token'),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useFamilyId(): string {
+  const { data: user } = useCurrentUser();
+  return user?.family_id ?? '';
 }
 
 export function isAuthenticated(): boolean {

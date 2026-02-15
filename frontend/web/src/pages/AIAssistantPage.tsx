@@ -17,9 +17,8 @@ import {
 import { useChildren } from '../hooks/useChildren';
 import { useCreateRule } from '../hooks/useRules';
 import { useParseRule, useWeeklyReport, useChat } from '../hooks/useLLM';
+import { useFamilyId } from '../hooks/useAuth';
 import type { ChatMessage, ParseRuleResponse, WeeklyReportResponse } from '../types';
-
-const FAMILY_ID = 'demo';
 
 const DAY_TYPE_LABELS: Record<string, string> = {
   weekday: 'Wochentag',
@@ -29,7 +28,8 @@ const DAY_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function AIAssistantPage() {
-  const { data: children, isLoading: childrenLoading } = useChildren(FAMILY_ID);
+  const familyId = useFamilyId();
+  const { data: children, isLoading: childrenLoading } = useChildren(familyId);
 
   // ── NL Rule state ───────────────────────────────────────────────────────
   const [ruleText, setRuleText] = useState('');

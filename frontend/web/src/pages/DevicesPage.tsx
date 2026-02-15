@@ -18,9 +18,8 @@ import {
   useBlockDevice,
   useUnblockDevice,
 } from '../hooks/useDevices';
+import { useFamilyId } from '../hooks/useAuth';
 import type { Device } from '../types';
-
-const FAMILY_ID = 'demo';
 
 function deviceIcon(type: string) {
   switch (type) {
@@ -129,7 +128,8 @@ function DeviceCard({
 
 export default function DevicesPage() {
   const { childId } = useParams<{ childId: string }>();
-  const { data: children } = useChildren(FAMILY_ID);
+  const familyId = useFamilyId();
+  const { data: children } = useChildren(familyId);
   const child = children?.find((c) => c.id === childId);
 
   const {

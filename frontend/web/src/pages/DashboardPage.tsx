@@ -15,9 +15,8 @@ import {
 } from 'lucide-react';
 import { useChildren } from '../hooks/useChildren';
 import { useFamilyDashboard, useChildDashboard } from '../hooks/useAnalytics';
+import { useFamilyId } from '../hooks/useAuth';
 import type { User } from '../types';
-
-const FAMILY_ID = 'demo';
 
 function ChildCard({ child }: { child: User }) {
   const navigate = useNavigate();
@@ -151,8 +150,9 @@ function ChildCard({ child }: { child: User }) {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { data: children, isLoading, isError, error } = useChildren(FAMILY_ID);
-  const { data: familyStats } = useFamilyDashboard(FAMILY_ID);
+  const familyId = useFamilyId();
+  const { data: children, isLoading, isError, error } = useChildren(familyId);
+  const { data: familyStats } = useFamilyDashboard(familyId);
 
   return (
     <div className="mx-auto max-w-6xl">
