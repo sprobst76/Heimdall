@@ -1,10 +1,14 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/agent_bridge.dart';
 import 'quest_overview_screen.dart';
 import 'tan_screen.dart';
 import 'status_screen.dart';
 import 'chat_screen.dart';
+import 'blocking_overlay_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,6 +19,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  bool _overlayShown = false;
 
   final _screens = const [
     QuestOverviewScreen(),
@@ -22,6 +27,47 @@ class _HomeScreenState extends State<HomeScreen> {
     StatusScreen(),
     ChatScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    if (Platform.isWindows) {
+      AgentBridge.onBlockTriggered = _handleBlockTriggered;
+    }
+  }
+
+  @override
+  void dispose() {
+    if (Platform.isWindows) {
+      AgentBridge.onBlockTriggered = null;
+    }
+    super.dispose();
+  }
+
+  void _handleBlockTriggered(String executable, String groupId) {
+    if (_overlayShown || !mounted) return;
+    _overlayShown = true;
+
+    // Lookup group info from WinAgentService
+    final bridge = AgentBridge.windowsBridge;
+    final limits = bridge?.service.groupLimits.value ?? [];
+    final gl = limits.where((g) => g.appGroupId == groupId).firstOrNull;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BlockingOverlayScreen(
+          appName: executable,
+          groupName: gl?.groupName ?? groupId,
+          usedMinutes: gl?.usedMinutes ?? 0,
+          limitMinutes: gl?.limitMinutes ?? 0,
+          onDismiss: () {
+            _overlayShown = false;
+            Navigator.of(context).pop();
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

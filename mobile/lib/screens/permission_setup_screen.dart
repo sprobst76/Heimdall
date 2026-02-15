@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import '../services/agent_bridge.dart';
 
@@ -48,63 +50,94 @@ class _PermissionSetupScreenState extends State<PermissionSetupScreen>
     }
   }
 
+  bool get _isWindows => Platform.isWindows;
+
+  List<_PermissionStep> get _steps => _isWindows ? _windowsSteps : _androidSteps;
+
   int get _grantedCount =>
-      _permissions.values.where((v) => v).length;
+      _steps.where((s) => s.granted).length;
 
   bool get _criticalGranted =>
-      (_permissions['accessibility'] ?? false) &&
-      (_permissions['overlay'] ?? false);
+      _steps.where((s) => s.critical).every((s) => s.granted);
+
+  List<_PermissionStep> get _androidSteps => [
+        _PermissionStep(
+          number: 1,
+          title: 'Bedienungshilfen',
+          description:
+              'Heimdall muss erkennen können, welche App gerade im Vordergrund ist. '
+              'Dazu wird der Bedienungshilfen-Dienst benötigt.',
+          icon: Icons.accessibility_new,
+          granted: _permissions['accessibility'] ?? false,
+          critical: true,
+          onRequest: AgentBridge.requestAccessibility,
+        ),
+        _PermissionStep(
+          number: 2,
+          title: 'Über anderen Apps anzeigen',
+          description:
+              'Wenn eine gesperrte App geöffnet wird, zeigt Heimdall einen '
+              'Sperrbildschirm darüber an. Dafür ist die Overlay-Berechtigung nötig.',
+          icon: Icons.layers,
+          granted: _permissions['overlay'] ?? false,
+          critical: true,
+          onRequest: AgentBridge.requestOverlay,
+        ),
+        _PermissionStep(
+          number: 3,
+          title: 'Nutzungszugriff',
+          description:
+              'Ermöglicht Heimdall, die tägliche Bildschirmzeit pro App zu messen '
+              'und Statistiken anzuzeigen.',
+          icon: Icons.bar_chart,
+          granted: _permissions['usageStats'] ?? false,
+          critical: false,
+          onRequest: AgentBridge.requestUsageStats,
+        ),
+        _PermissionStep(
+          number: 4,
+          title: 'Geräte-Administrator',
+          description:
+              'Schützt die Heimdall-App vor Deinstallation durch das Kind.',
+          icon: Icons.admin_panel_settings,
+          granted: _permissions['deviceAdmin'] ?? false,
+          critical: false,
+          onRequest: AgentBridge.requestDeviceAdmin,
+        ),
+      ];
+
+  List<_PermissionStep> get _windowsSteps => [
+        _PermissionStep(
+          number: 1,
+          title: 'App-Überwachung',
+          description:
+              'Heimdall überwacht, welches Programm gerade im Vordergrund ist, '
+              'und setzt die Zeitlimits durch.',
+          icon: Icons.monitor,
+          granted: _permissions['monitoring'] ?? false,
+          critical: true,
+          onRequest: () async {
+            // Monitoring ist auf Windows immer verfügbar
+          },
+        ),
+        _PermissionStep(
+          number: 2,
+          title: 'Autostart',
+          description:
+              'Heimdall startet automatisch beim Windows-Start, damit die '
+              'Kindersicherung immer aktiv ist.',
+          icon: Icons.power_settings_new,
+          granted: _permissions['autostart'] ?? false,
+          critical: false,
+          onRequest: AgentBridge.requestAccessibility, // maps to requestAutostart on Windows
+        ),
+      ];
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final totalSteps = 4;
-
-    final steps = [
-      _PermissionStep(
-        number: 1,
-        title: 'Bedienungshilfen',
-        description:
-            'Heimdall muss erkennen können, welche App gerade im Vordergrund ist. '
-            'Dazu wird der Bedienungshilfen-Dienst benötigt.',
-        icon: Icons.accessibility_new,
-        granted: _permissions['accessibility'] ?? false,
-        critical: true,
-        onRequest: AgentBridge.requestAccessibility,
-      ),
-      _PermissionStep(
-        number: 2,
-        title: 'Über anderen Apps anzeigen',
-        description:
-            'Wenn eine gesperrte App geöffnet wird, zeigt Heimdall einen '
-            'Sperrbildschirm darüber an. Dafür ist die Overlay-Berechtigung nötig.',
-        icon: Icons.layers,
-        granted: _permissions['overlay'] ?? false,
-        critical: true,
-        onRequest: AgentBridge.requestOverlay,
-      ),
-      _PermissionStep(
-        number: 3,
-        title: 'Nutzungszugriff',
-        description:
-            'Ermöglicht Heimdall, die tägliche Bildschirmzeit pro App zu messen '
-            'und Statistiken anzuzeigen.',
-        icon: Icons.bar_chart,
-        granted: _permissions['usageStats'] ?? false,
-        critical: false,
-        onRequest: AgentBridge.requestUsageStats,
-      ),
-      _PermissionStep(
-        number: 4,
-        title: 'Geräte-Administrator',
-        description:
-            'Schützt die Heimdall-App vor Deinstallation durch das Kind.',
-        icon: Icons.admin_panel_settings,
-        granted: _permissions['deviceAdmin'] ?? false,
-        critical: false,
-        onRequest: AgentBridge.requestDeviceAdmin,
-      ),
-    ];
+    final steps = _steps;
+    final totalSteps = steps.length;
 
     return Scaffold(
       body: _loading

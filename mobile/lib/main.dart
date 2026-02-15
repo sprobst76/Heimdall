@@ -1,6 +1,9 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
+import 'package:window_manager/window_manager.dart';
 import 'services/api_service.dart';
 import 'services/mock_api_service.dart';
 import 'services/agent_bridge.dart';
@@ -8,12 +11,21 @@ import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/permission_setup_screen.dart';
+import 'screens/blocking_overlay_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize native agent bridge on Android
-  if (defaultTargetPlatform == TargetPlatform.android) {
+  // Windows Desktop: configure window
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    await windowManager.ensureInitialized();
+    await windowManager.setTitle('Heimdall Kind');
+    await windowManager.setMinimumSize(const Size(380, 680));
+    await windowManager.setSize(const Size(420, 780));
+  }
+
+  // Initialize agent bridge (Android or Windows)
+  if (defaultTargetPlatform == TargetPlatform.android || Platform.isWindows) {
     AgentBridge.initialize();
   }
 
@@ -150,18 +162,29 @@ class _AuthGateState extends State<AuthGate> {
     if (_permissionsChecked) return;
     _permissionsChecked = true;
 
-    if (defaultTargetPlatform != TargetPlatform.android) {
+    final isAndroid = defaultTargetPlatform == TargetPlatform.android;
+    final isWindows = Platform.isWindows;
+
+    if (!isAndroid && !isWindows) {
+      // Unsupported platform (iOS, web, Linux dev) — skip
       setState(() => _permissionsOk = true);
       return;
     }
 
     try {
       final perms = await AgentBridge.checkPermissions();
-      final hasAccessibility = perms['accessibility'] ?? false;
-      final hasOverlay = perms['overlay'] ?? false;
 
-      if (hasAccessibility && hasOverlay) {
-        // Kritische Berechtigungen vorhanden → direkt weiter
+      // Platform-spezifische kritische Berechtigungen prüfen
+      final bool criticalOk;
+      if (isAndroid) {
+        criticalOk = (perms['accessibility'] ?? false) &&
+            (perms['overlay'] ?? false);
+      } else {
+        // Windows: monitoring ist immer verfügbar
+        criticalOk = perms['monitoring'] ?? false;
+      }
+
+      if (criticalOk) {
         await AgentBridge.startMonitoring();
         if (widget.autoLogin) await _setupDemoBlocking();
         if (mounted) setState(() => _permissionsOk = true);
