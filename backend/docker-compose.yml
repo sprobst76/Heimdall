@@ -100,8 +100,41 @@ services:
       start_period: 15s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.heimdall.rule=Host(`heimdall.lab.${DOMAIN}`)"
-      - "traefik.http.routers.heimdall.entrypoints=websecure"
-      - "traefik.http.routers.heimdall.tls.certresolver=cloudflare"
-      - "traefik.http.routers.heimdall.middlewares=security-headers@file,rate-limit-standard@file"
-      - "traefik.http.services.heimdall.loadbalancer.server.port=8000"
+      - "traefik.http.routers.heimdall-api.rule=Host(`heimdall.lab.${DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/health`) || PathPrefix(`/docs`) || PathPrefix(`/openapi.json`))"
+      - "traefik.http.routers.heimdall-api.entrypoints=websecure"
+      - "traefik.http.routers.heimdall-api.tls.certresolver=cloudflare"
+      - "traefik.http.routers.heimdall-api.middlewares=security-headers@file,rate-limit-standard@file"
+      - "traefik.http.routers.heimdall-api.priority=20"
+      - "traefik.http.services.heimdall-api.loadbalancer.server.port=8000"
+
+  web:
+    build:
+      context: ../frontend/web
+      dockerfile: Dockerfile
+    image: heimdall-web:latest
+    container_name: heimdall-web
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    networks:
+      - ai-lab_ai-lab
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.heimdall-web.rule=Host(`heimdall.lab.${DOMAIN}`)"
+      - "traefik.http.routers.heimdall-web.entrypoints=websecure"
+      - "traefik.http.routers.heimdall-web.tls.certresolver=cloudflare"
+      - "traefik.http.routers.heimdall-web.middlewares=security-headers@file"
+      - "traefik.http.routers.heimdall-web.priority=10"
+      - "traefik.http.services.heimdall-web.loadbalancer.server.port=80"

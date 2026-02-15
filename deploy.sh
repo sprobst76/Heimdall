@@ -93,11 +93,11 @@ update() {
     log_info "Pulling latest changes..."
     git pull
 
-    # Rebuild and restart API
+    # Rebuild and restart API + Web
     cd "$BACKEND_DIR"
-    log_info "Rebuilding API container..."
-    docker compose build --no-cache api
-    docker compose up -d api
+    log_info "Rebuilding containers..."
+    docker compose build --no-cache api web
+    docker compose up -d api web
 
     # Run migrations
     log_info "Running database migrations..."
