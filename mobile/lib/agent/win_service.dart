@@ -92,7 +92,7 @@ typedef BlockTriggeredCallback = void Function(
 
 /// Central Windows agent service.
 class WinAgentService {
-  late final WinMonitor _monitor;
+  WinMonitor _monitor;
   late final WinBlocker _blocker;
 
   Map<String, String> _appGroupMap;
@@ -114,7 +114,11 @@ class WinAgentService {
 
   WinAgentService({
     Map<String, String>? appGroupMap,
-  }) : _appGroupMap = appGroupMap ?? {} {
+  })  : _appGroupMap = appGroupMap ?? {},
+        _monitor = WinMonitor(
+          appGroupMap: appGroupMap ?? {},
+          onAppChange: _dummyAppChange,
+        ) {
     _blocker = WinBlocker();
     _monitor = WinMonitor(
       appGroupMap: _appGroupMap,
@@ -122,6 +126,9 @@ class WinAgentService {
     );
     _blocker.onBlockAction = _handleBlockAction;
   }
+
+  // Placeholder für initializer list (wird sofort überschrieben)
+  static void _dummyAppChange(AppSession? a, AppSession? b) {}
 
   WinMonitor get monitor => _monitor;
   WinBlocker get blocker => _blocker;
