@@ -56,7 +56,16 @@ class WindowsAgentBridge {
       return {'autostart': true, 'monitoring': true};
     }
 
-    final autostartEnabled = await launchAtStartup.isEnabled();
+    bool autostartEnabled = false;
+    try {
+      launchAtStartup.setup(
+        appName: 'Heimdall Kind',
+        appPath: Platform.resolvedExecutable,
+      );
+      autostartEnabled = await launchAtStartup.isEnabled();
+    } catch (e) {
+      debugPrint('WindowsAgentBridge: autostart check failed: $e');
+    }
 
     return {
       'autostart': autostartEnabled,
