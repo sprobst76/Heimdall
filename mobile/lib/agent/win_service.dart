@@ -15,8 +15,8 @@ import 'win_blocker.dart';
 const kDemoAppGroupMap = <String, String>{
   // Gaming (easy to test on any PC)
   'notepad.exe': 'gaming',
-  'calc.exe': 'gaming',
-  'calculatorapp.exe': 'gaming',
+  'mspaint.exe': 'gaming',
+  'wordpad.exe': 'gaming',
   'minesweeper.exe': 'gaming',
   'solitaire.exe': 'gaming',
   // Browser
@@ -109,6 +109,18 @@ class WinAgentService {
   /// Called when a blocked app is detected.
   BlockTriggeredCallback? onBlockTriggered;
 
+  /// Called when full lockdown starts (show fullscreen overlay).
+  void Function(int durationSeconds)? onFullLockdown;
+
+  /// Called when full lockdown ends.
+  VoidCallback? onFullLockdownEnd;
+
+  /// Whether full lockdown is active.
+  bool _fullLockdown = false;
+  Timer? _lockdownTimer;
+
+  bool get isFullLockdown => _fullLockdown;
+
   /// Called when foreground app changes (for status screen).
   void Function(AppSession? session)? onAppChanged;
 
@@ -191,6 +203,33 @@ class WinAgentService {
   void unblockGroup(String groupId) {
     _blocker.unblockGroup(groupId);
     _updateStatus();
+  }
+
+  /// Start full lockdown — fullscreen overlay, no app killing.
+  void startFullLockdown({int durationSeconds = 30}) {
+    if (_fullLockdown) return;
+    _fullLockdown = true;
+    _blocker.killEnabled = false; // Don't kill during lockdown
+    _updateStatus();
+    debugPrint('WinAgentService: full lockdown started (${durationSeconds}s)');
+    onFullLockdown?.call(durationSeconds);
+
+    _lockdownTimer?.cancel();
+    _lockdownTimer = Timer(Duration(seconds: durationSeconds), () {
+      stopFullLockdown();
+    });
+  }
+
+  /// End full lockdown.
+  void stopFullLockdown() {
+    if (!_fullLockdown) return;
+    _fullLockdown = false;
+    _lockdownTimer?.cancel();
+    _lockdownTimer = null;
+    _blocker.killEnabled = true; // Re-enable killing
+    _updateStatus();
+    debugPrint('WinAgentService: full lockdown ended');
+    onFullLockdownEnd?.call();
   }
 
   /// Get usage by group (used/limit minutes).

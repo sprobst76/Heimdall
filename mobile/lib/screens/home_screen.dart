@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:window_manager/window_manager.dart';
 import '../providers/auth_provider.dart';
 import '../services/agent_bridge.dart';
 import 'quest_overview_screen.dart';
@@ -20,6 +21,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   bool _overlayShown = false;
+  bool _lockdownShown = false;
 
   final _screens = const [
     QuestOverviewScreen(),
@@ -33,6 +35,12 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     if (Platform.isWindows) {
       AgentBridge.onBlockTriggered = _handleBlockTriggered;
+      // Wire up full lockdown callbacks
+      final service = AgentBridge.windowsBridge?.service;
+      if (service != null) {
+        service.onFullLockdown = _handleFullLockdown;
+        service.onFullLockdownEnd = _handleFullLockdownEnd;
+      }
     }
   }
 
@@ -40,12 +48,17 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     if (Platform.isWindows) {
       AgentBridge.onBlockTriggered = null;
+      final service = AgentBridge.windowsBridge?.service;
+      if (service != null) {
+        service.onFullLockdown = null;
+        service.onFullLockdownEnd = null;
+      }
     }
     super.dispose();
   }
 
   void _handleBlockTriggered(String executable, String groupId) {
-    if (_overlayShown || !mounted) return;
+    if (_overlayShown || _lockdownShown || !mounted) return;
     _overlayShown = true;
 
     // Lookup group info from WinAgentService
@@ -69,6 +82,58 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _handleFullLockdown(int durationSeconds) {
+    if (_lockdownShown || !mounted) return;
+    _lockdownShown = true;
+
+    // Go fullscreen + always on top
+    _setFullscreen(true);
+
+    // Pop any existing overlay first
+    if (_overlayShown) {
+      _overlayShown = false;
+      Navigator.of(context).pop();
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FullLockdownScreen(
+          durationSeconds: durationSeconds,
+          onFinished: _endFullLockdown,
+        ),
+      ),
+    );
+  }
+
+  void _handleFullLockdownEnd() {
+    _endFullLockdown();
+  }
+
+  void _endFullLockdown() {
+    if (!_lockdownShown) return;
+    _lockdownShown = false;
+    _setFullscreen(false);
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+    // Also stop the service-side lockdown if still active
+    AgentBridge.windowsBridge?.service.stopFullLockdown();
+  }
+
+  Future<void> _setFullscreen(bool fullscreen) async {
+    if (!Platform.isWindows) return;
+    try {
+      await windowManager.setAlwaysOnTop(fullscreen);
+      await windowManager.setFullScreen(fullscreen);
+    } catch (e) {
+      debugPrint('HomeScreen: window_manager error: $e');
+    }
+  }
+
+  void _triggerDemoLockdown() {
+    AgentBridge.windowsBridge?.service.startFullLockdown(durationSeconds: 30);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -84,6 +149,13 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
+          // Demo: Vollsperrung button (only on Windows)
+          if (Platform.isWindows)
+            IconButton(
+              icon: const Icon(Icons.lock),
+              tooltip: 'Vollsperrung testen (30s)',
+              onPressed: _triggerDemoLockdown,
+            ),
           if (auth.childName != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),

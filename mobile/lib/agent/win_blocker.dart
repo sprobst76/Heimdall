@@ -21,7 +21,11 @@ typedef BlockActionCallback = void Function(
 class WinBlocker {
   final Set<String> blockedGroups = {};
 
-  /// Called after a process has been killed.
+  /// When false, enforce() fires the callback but does NOT kill the process.
+  /// Used during full lockdown (Vollsperrung).
+  bool killEnabled = true;
+
+  /// Called after a blocked app is detected (killed or just blocked).
   BlockActionCallback? onBlockAction;
 
   void blockGroup(String groupId) {
@@ -47,8 +51,8 @@ class WinBlocker {
     if (session == null) return;
     if (!isBlocked(session.appGroupId)) return;
 
-    // Don't kill simulated processes or PID 0 (dummy)
-    if (session.pid > 0 && session.pid != 99999) {
+    // Kill process only if enabled (disabled during Vollsperrung)
+    if (killEnabled && session.pid > 0 && session.pid != 99999) {
       _killProcess(session.pid, session.executable);
     }
 
