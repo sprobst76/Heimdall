@@ -421,6 +421,32 @@ export interface UsageRewardLog {
   created_at: string;
 }
 
+// ── Invitation ──────────────────────────────────────────────────────────────
+
+export interface FamilyInvitation {
+  id: string;
+  family_id: string;
+  code: string;
+  role: string;
+  created_by: string;
+  expires_at: string;
+  used_by: string | null;
+  used_at: string | null;
+  created_at: string;
+}
+
+export interface InvitationCreate {
+  role?: string;
+}
+
+export interface RegisterWithInvitationRequest {
+  email: string;
+  password: string;
+  password_confirm: string;
+  name: string;
+  invitation_code: string;
+}
+
 // ── Analytics ────────────────────────────────────────────────────────────────
 
 export interface GroupUsage {

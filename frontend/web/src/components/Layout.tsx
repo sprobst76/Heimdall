@@ -108,6 +108,11 @@ export default function Layout() {
             Kalender
           </NavLink>
 
+          <NavLink to="/family" className={navLinkClasses} onClick={() => setSidebarOpen(false)}>
+            <Users className="h-4 w-4" />
+            Familie
+          </NavLink>
+
           {/* Children section */}
           {children && children.length > 0 && (
             <div className="mt-6">

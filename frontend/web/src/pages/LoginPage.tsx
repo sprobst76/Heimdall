@@ -1,30 +1,54 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Eye, EyeOff, Loader2 } from 'lucide-react';
-import { useLogin, useRegister } from '../hooks/useAuth';
+import { useLogin, useRegister, useRegisterWithInvitation } from '../hooks/useAuth';
 
 type Tab = 'login' | 'register';
+
+function getPasswordStrength(pw: string): 'weak' | 'medium' | 'strong' {
+  if (!pw) return 'weak';
+  let classes = 0;
+  if (/[a-z]/.test(pw)) classes++;
+  if (/[A-Z]/.test(pw)) classes++;
+  if (/[0-9]/.test(pw)) classes++;
+  if (/[^a-zA-Z0-9]/.test(pw)) classes++;
+
+  if (pw.length >= 12 && classes >= 3) return 'strong';
+  if (pw.length >= 10 && classes >= 2) return 'medium';
+  return 'weak';
+}
+
+const STRENGTH_CONFIG = {
+  weak: { label: 'Schwach', width: 'w-1/3', color: 'bg-red-500', text: 'text-red-600' },
+  medium: { label: 'Mittel', width: 'w-2/3', color: 'bg-amber-500', text: 'text-amber-600' },
+  strong: { label: 'Stark', width: 'w-full', color: 'bg-emerald-500', text: 'text-emerald-600' },
+};
 
 export default function LoginPage() {
   const [tab, setTab] = useState<Tab>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [name, setName] = useState('');
   const [familyName, setFamilyName] = useState('');
+  const [invitationCode, setInvitationCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
   const navigate = useNavigate();
   const login = useLogin();
   const register = useRegister();
+  const registerWithInvitation = useRegisterWithInvitation();
 
-  const isLoading = login.isPending || register.isPending;
+  const isLoading = login.isPending || register.isPending || registerWithInvitation.isPending;
 
   function resetForm() {
     setEmail('');
     setPassword('');
+    setPasswordConfirm('');
     setName('');
     setFamilyName('');
+    setInvitationCode('');
     setError('');
   }
 
@@ -56,13 +80,28 @@ export default function LoginPage() {
       return;
     }
 
+    if (password !== passwordConfirm) {
+      setError('Passwörter stimmen nicht überein');
+      return;
+    }
+
     try {
-      await register.mutateAsync({
-        email,
-        password,
-        name,
-        family_name: familyName,
-      });
+      if (invitationCode.trim()) {
+        await registerWithInvitation.mutateAsync({
+          email,
+          password,
+          password_confirm: passwordConfirm,
+          name,
+          invitation_code: invitationCode.trim(),
+        });
+      } else {
+        await register.mutateAsync({
+          email,
+          password,
+          name,
+          family_name: familyName,
+        });
+      }
       navigate('/', { replace: true });
     } catch (err: unknown) {
       const msg =
@@ -71,6 +110,9 @@ export default function LoginPage() {
       setError(msg);
     }
   }
+
+  const strength = getPasswordStrength(password);
+  const strengthCfg = STRENGTH_CONFIG[strength];
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-600 via-indigo-700 to-[#1E1B4B] px-4">
@@ -82,7 +124,7 @@ export default function LoginPage() {
           </div>
           <h1 className="mt-4 text-3xl font-bold text-white">Heimdall</h1>
           <p className="mt-1 text-sm text-indigo-200">
-            Digitaler Kinderschutz fur die ganze Familie
+            Digitaler Kinderschutz für die ganze Familie
           </p>
         </div>
 
@@ -175,6 +217,25 @@ export default function LoginPage() {
           {/* Register Form */}
           {tab === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
+              {/* Invitation Code (optional) */}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Einladungscode <span className="text-slate-400">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={invitationCode}
+                  onChange={(e) => setInvitationCode(e.target.value.toUpperCase())}
+                  placeholder="z.B. ODIN-3382"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-mono text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+                {invitationCode.trim() && (
+                  <p className="mt-1 text-xs text-indigo-600">
+                    Sie treten einer bestehenden Familie bei.
+                  </p>
+                )}
+              </div>
+
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">
                   Vorname
@@ -188,19 +249,24 @@ export default function LoginPage() {
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Familienname
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={familyName}
-                  onChange={(e) => setFamilyName(e.target.value)}
-                  placeholder="Mustermann"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                />
-              </div>
+
+              {/* Family name — only shown when no invitation code */}
+              {!invitationCode.trim() && (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Familienname
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={familyName}
+                    onChange={(e) => setFamilyName(e.target.value)}
+                    placeholder="Mustermann"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">
                   E-Mail
@@ -214,6 +280,7 @@ export default function LoginPage() {
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
               </div>
+
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">
                   Passwort
@@ -239,7 +306,40 @@ export default function LoginPage() {
                     )}
                   </button>
                 </div>
+                {/* Password strength indicator */}
+                {password && (
+                  <div className="mt-2">
+                    <div className="h-1.5 w-full rounded-full bg-slate-200">
+                      <div className={`h-full rounded-full transition-all ${strengthCfg.width} ${strengthCfg.color}`} />
+                    </div>
+                    <p className={`mt-1 text-xs font-medium ${strengthCfg.text}`}>
+                      {strengthCfg.label}
+                    </p>
+                  </div>
+                )}
               </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Passwort wiederholen
+                </label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={passwordConfirm}
+                  onChange={(e) => setPasswordConfirm(e.target.value)}
+                  placeholder="Passwort bestätigen"
+                  className={`w-full rounded-lg border px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 ${
+                    passwordConfirm && password !== passwordConfirm
+                      ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20'
+                      : 'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/20'
+                  }`}
+                />
+                {passwordConfirm && password !== passwordConfirm && (
+                  <p className="mt-1 text-xs text-red-600">Passwörter stimmen nicht überein</p>
+                )}
+              </div>
+
               <button
                 type="submit"
                 disabled={isLoading}
@@ -253,7 +353,7 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-indigo-300">
-          Heimdall Kinderschutz &mdash; Sicherheit fur die digitale Welt
+          Heimdall Kinderschutz &mdash; Sicherheit für die digitale Welt
         </p>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import {
   Users,
+  UserPlus,
   Shield,
   Ticket,
   Clock,
@@ -270,20 +271,30 @@ export default function DashboardPage() {
 
       {!isLoading && !isError && children && children.length === 0 && (
         <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white py-16">
-          <Users className="mb-4 h-12 w-12 text-slate-300" />
+          <Shield className="mb-4 h-12 w-12 text-indigo-300" />
           <h3 className="text-lg font-semibold text-slate-700">
-            Noch keine Kinder angelegt
+            Willkommen bei Heimdall!
           </h3>
-          <p className="mt-1 mb-6 text-sm text-slate-500">
-            Legen Sie Ihr erstes Kind an, um Regeln und TANs zu verwalten.
+          <p className="mt-1 mb-6 max-w-sm text-center text-sm text-slate-500">
+            Richten Sie Ihre Familie ein und fügen Sie Ihr erstes Kind hinzu,
+            um Zeitregeln, Quests und TANs zu verwalten.
           </p>
-          <button
-            onClick={() => navigate('/children')}
-            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
-          >
-            <Plus className="h-4 w-4" />
-            Kind hinzufügen
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => navigate('/children')}
+              className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+            >
+              <Plus className="h-4 w-4" />
+              Kind hinzufügen
+            </button>
+            <button
+              onClick={() => navigate('/family')}
+              className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              <UserPlus className="h-4 w-4" />
+              Elternteil einladen
+            </button>
+          </div>
         </div>
       )}
 

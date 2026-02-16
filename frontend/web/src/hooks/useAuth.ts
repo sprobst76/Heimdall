@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/client';
-import type { LoginRequest, RegisterRequest, TokenResponse, User } from '../types';
+import type { LoginRequest, RegisterRequest, RegisterWithInvitationRequest, TokenResponse, User } from '../types';
 
 export function useLogin() {
   return useMutation({
@@ -17,6 +17,17 @@ export function useRegister() {
   return useMutation({
     mutationFn: async (data: RegisterRequest) => {
       const res = await api.post<TokenResponse>('/auth/register', data);
+      localStorage.setItem('access_token', res.data.access_token);
+      localStorage.setItem('refresh_token', res.data.refresh_token);
+      return res.data;
+    },
+  });
+}
+
+export function useRegisterWithInvitation() {
+  return useMutation({
+    mutationFn: async (data: RegisterWithInvitationRequest) => {
+      const res = await api.post<TokenResponse>('/auth/register-with-invitation', data);
       localStorage.setItem('access_token', res.data.access_token);
       localStorage.setItem('refresh_token', res.data.refresh_token);
       return res.data;

@@ -23,12 +23,14 @@ from app.core.security import (
 )
 from app.database import get_db
 from app.models.family import Family
+from app.models.invitation import FamilyInvitation
 from app.models.user import RefreshToken, User
 from app.core.dependencies import get_current_user
 from app.schemas.auth import (
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
+    RegisterWithInvitationRequest,
     TokenResponse,
 )
 
@@ -85,13 +87,13 @@ async def login(
     if user is None or user.password_hash is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
+            detail="Ungültige E-Mail oder Passwort",
         )
 
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
+            detail="Ungültige E-Mail oder Passwort",
         )
 
     return await _create_tokens_for_user(db, user)
@@ -108,7 +110,7 @@ async def register(
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered",
+            detail="E-Mail bereits registriert",
         )
 
     # Create family
@@ -216,3 +218,59 @@ async def logout(
 
     # Always return 204 regardless of whether the token was found
     return None
+
+
+@router.post("/register-with-invitation", response_model=TokenResponse)
+async def register_with_invitation(
+    body: RegisterWithInvitationRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Register a new parent user using a family invitation code."""
+    # Validate password confirmation
+    if body.password != body.password_confirm:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Passwörter stimmen nicht überein",
+        )
+
+    # Check if email already exists
+    existing = await db.execute(select(User).where(User.email == body.email))
+    if existing.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="E-Mail bereits registriert",
+        )
+
+    # Look up invitation code
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(FamilyInvitation).where(
+            FamilyInvitation.code == body.invitation_code,
+            FamilyInvitation.used_by.is_(None),
+            FamilyInvitation.expires_at > now,
+        )
+    )
+    invitation = result.scalar_one_or_none()
+    if invitation is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Einladungscode ungültig oder abgelaufen",
+        )
+
+    # Create user in the invitation's family
+    user = User(
+        family_id=invitation.family_id,
+        name=body.name,
+        role=invitation.role,
+        email=body.email,
+        password_hash=get_password_hash(body.password),
+    )
+    db.add(user)
+    await db.flush()
+
+    # Mark invitation as used
+    invitation.used_by = user.id
+    invitation.used_at = now
+    await db.flush()
+
+    return await _create_tokens_for_user(db, user)

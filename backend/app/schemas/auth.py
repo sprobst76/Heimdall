@@ -21,3 +21,11 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8)
     name: str
     family_name: str  # creates new family on first registration
+
+
+class RegisterWithInvitationRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8)
+    password_confirm: str = Field(min_length=8)
+    name: str
+    invitation_code: str

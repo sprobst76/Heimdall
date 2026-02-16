@@ -13,6 +13,7 @@ import AIAssistantPage from './pages/AIAssistantPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import DevicesPage from './pages/DevicesPage';
 import UsageRewardsPage from './pages/UsageRewardsPage';
+import FamilySettingsPage from './pages/FamilySettingsPage';
 import HolidaysPage from './pages/HolidaysPage';
 
 const queryClient = new QueryClient({
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="devices/:childId" element={<DevicesPage />} />
             <Route path="usage-rewards/:childId" element={<UsageRewardsPage />} />
             <Route path="holidays" element={<HolidaysPage />} />
+            <Route path="family" element={<FamilySettingsPage />} />
             <Route path="analytics/:childId" element={<AnalyticsPage />} />
           </Route>
         </Routes>
