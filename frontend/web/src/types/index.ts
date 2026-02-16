@@ -360,6 +360,55 @@ export interface ChatResponse {
   response: string;
 }
 
+// ── Usage Rewards ───────────────────────────────────────────────────────────
+
+export interface UsageRewardRule {
+  id: string;
+  child_id: string;
+  name: string;
+  trigger_type: 'daily_under' | 'streak_under' | 'group_free';
+  threshold_minutes: number;
+  target_group_id: string | null;
+  streak_days: number | null;
+  reward_minutes: number;
+  reward_group_ids: string[] | null;
+  active: boolean;
+  created_at: string;
+}
+
+export interface UsageRewardRuleCreate {
+  name: string;
+  trigger_type: string;
+  threshold_minutes: number;
+  target_group_id?: string | null;
+  streak_days?: number | null;
+  reward_minutes: number;
+  reward_group_ids?: string[] | null;
+}
+
+export interface UsageRewardRuleUpdate {
+  name?: string;
+  trigger_type?: string;
+  threshold_minutes?: number;
+  target_group_id?: string | null;
+  streak_days?: number | null;
+  reward_minutes?: number;
+  reward_group_ids?: string[] | null;
+  active?: boolean;
+}
+
+export interface UsageRewardLog {
+  id: string;
+  rule_id: string;
+  child_id: string;
+  evaluated_date: string;
+  usage_minutes: number;
+  threshold_minutes: number;
+  rewarded: boolean;
+  generated_tan_id: string | null;
+  created_at: string;
+}
+
 // ── Analytics ────────────────────────────────────────────────────────────────
 
 export interface GroupUsage {

@@ -12,6 +12,7 @@ from app.models.quest import QuestInstance, QuestTemplate  # noqa: F401
 from app.models.tan import TAN  # noqa: F401
 from app.models.time_rule import TimeRule  # noqa: F401
 from app.models.usage import UsageEvent  # noqa: F401
+from app.models.usage_reward import UsageRewardLog, UsageRewardRule  # noqa: F401
 from app.models.user import RefreshToken, User  # noqa: F401
 
 __all__ = [
@@ -27,5 +28,7 @@ __all__ = [
     "TAN",
     "TimeRule",
     "UsageEvent",
+    "UsageRewardLog",
+    "UsageRewardRule",
     "User",
 ]

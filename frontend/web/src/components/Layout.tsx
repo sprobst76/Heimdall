@@ -7,6 +7,7 @@ import {
   Ticket,
   Grid3x3,
   Trophy,
+  Gift,
   ClipboardCheck,
   Brain,
   BarChart3,
@@ -159,6 +160,14 @@ export default function Layout() {
                       >
                         <Trophy className="h-3.5 w-3.5" />
                         Quests
+                      </NavLink>
+                      <NavLink
+                        to={`/usage-rewards/${child.id}`}
+                        className={childNavClasses}
+                        onClick={() => setSidebarOpen(false)}
+                      >
+                        <Gift className="h-3.5 w-3.5" />
+                        Belohnungen
                       </NavLink>
                       <NavLink
                         to={`/devices/${child.id}`}

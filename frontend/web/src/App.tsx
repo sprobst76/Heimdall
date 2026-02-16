@@ -12,6 +12,7 @@ import QuestReviewPage from './pages/QuestReviewPage';
 import AIAssistantPage from './pages/AIAssistantPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import DevicesPage from './pages/DevicesPage';
+import UsageRewardsPage from './pages/UsageRewardsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,6 +45,7 @@ export default function App() {
             <Route path="quest-reviews" element={<QuestReviewPage />} />
             <Route path="ai-assistant" element={<AIAssistantPage />} />
             <Route path="devices/:childId" element={<DevicesPage />} />
+            <Route path="usage-rewards/:childId" element={<UsageRewardsPage />} />
             <Route path="analytics/:childId" element={<AnalyticsPage />} />
           </Route>
         </Routes>
