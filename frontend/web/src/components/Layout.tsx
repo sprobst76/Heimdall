@@ -10,6 +10,7 @@ import {
   Gift,
   ClipboardCheck,
   Brain,
+  CalendarDays,
   BarChart3,
   Monitor,
   LogOut,
@@ -100,6 +101,11 @@ export default function Layout() {
           <NavLink to="/ai-assistant" className={navLinkClasses} onClick={() => setSidebarOpen(false)}>
             <Brain className="h-4 w-4" />
             KI-Assistent
+          </NavLink>
+
+          <NavLink to="/holidays" className={navLinkClasses} onClick={() => setSidebarOpen(false)}>
+            <CalendarDays className="h-4 w-4" />
+            Kalender
           </NavLink>
 
           {/* Children section */}

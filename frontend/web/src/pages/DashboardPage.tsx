@@ -12,9 +12,12 @@ import {
   Flame,
   Monitor,
   BarChart3,
+  Sun,
+  Palmtree,
 } from 'lucide-react';
 import { useChildren } from '../hooks/useChildren';
 import { useFamilyDashboard, useChildDashboard } from '../hooks/useAnalytics';
+import { useTodayDayType } from '../hooks/useDayTypes';
 import { useFamilyId } from '../hooks/useAuth';
 import type { User } from '../types';
 
@@ -153,6 +156,7 @@ export default function DashboardPage() {
   const familyId = useFamilyId();
   const { data: children, isLoading, isError, error } = useChildren(familyId);
   const { data: familyStats } = useFamilyDashboard(familyId);
+  const { data: todayOverride } = useTodayDayType(familyId);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -163,6 +167,34 @@ export default function DashboardPage() {
           Übersicht über alle Kinder und deren Aktivitäten
         </p>
       </div>
+
+      {/* Day type banner */}
+      {todayOverride && (todayOverride.day_type === 'holiday' || todayOverride.day_type === 'vacation') && (
+        <div className={`mb-6 flex items-center gap-3 rounded-xl border px-5 py-3 ${
+          todayOverride.day_type === 'holiday'
+            ? 'border-amber-200 bg-amber-50'
+            : 'border-sky-200 bg-sky-50'
+        }`}>
+          {todayOverride.day_type === 'holiday' ? (
+            <Sun className={`h-6 w-6 text-amber-500`} />
+          ) : (
+            <Palmtree className={`h-6 w-6 text-sky-500`} />
+          )}
+          <div>
+            <p className={`font-semibold ${
+              todayOverride.day_type === 'holiday' ? 'text-amber-800' : 'text-sky-800'
+            }`}>
+              Heute: {todayOverride.day_type === 'holiday' ? 'Feiertag' : 'Schulferien'}
+              {todayOverride.label && ` — ${todayOverride.label}`}
+            </p>
+            <p className={`text-sm ${
+              todayOverride.day_type === 'holiday' ? 'text-amber-600' : 'text-sky-600'
+            }`}>
+              Ferien-/Feiertagsregeln sind aktiv
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-4">

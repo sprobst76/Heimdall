@@ -11,6 +11,8 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+from sqlalchemy import select
+
 from app.config import settings
 from app.routers import agent, analytics, app_groups, auth, children, day_types, devices, families, llm, portal_ws, quests, tans, time_rules, uploads, usage_rewards
 
@@ -73,6 +75,37 @@ async def _usage_reward_loop() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Holiday Sync background task
+# ---------------------------------------------------------------------------
+async def _holiday_sync_loop() -> None:
+    """Sync holidays once at startup, then yearly on Jan 1st."""
+    from app.database import async_session
+    from app.models.family import Family
+    from app.services.holiday_service import sync_holidays_to_db
+
+    while True:
+        try:
+            async with async_session() as db:
+                families = (await db.execute(select(Family))).scalars().all()
+                year = datetime.now(timezone.utc).year
+                for family in families:
+                    await sync_holidays_to_db(db, family.id, year)
+                    await sync_holidays_to_db(db, family.id, year + 1)
+                await db.commit()
+                logger.info("Holiday sync: %d families synced", len(families))
+        except Exception:
+            logger.exception("Holiday sync error")
+
+        # Sleep until Jan 1st next year 00:15 UTC
+        now = datetime.now(timezone.utc)
+        next_jan = now.replace(
+            year=now.year + 1, month=1, day=1,
+            hour=0, minute=15, second=0, microsecond=0,
+        )
+        await asyncio.sleep((next_jan - now).total_seconds())
+
+
+# ---------------------------------------------------------------------------
 # Lifespan context manager
 # ---------------------------------------------------------------------------
 @asynccontextmanager
@@ -81,7 +114,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     logger.info("Heimdall API started")
     scheduler_task = asyncio.create_task(_quest_scheduler_loop())
     reward_task = asyncio.create_task(_usage_reward_loop())
+    holiday_task = asyncio.create_task(_holiday_sync_loop())
     yield
+    holiday_task.cancel()
     reward_task.cancel()
     scheduler_task.cancel()
     logger.info("Heimdall API shutting down")
