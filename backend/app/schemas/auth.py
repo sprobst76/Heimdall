@@ -29,3 +29,9 @@ class RegisterWithInvitationRequest(BaseModel):
     password_confirm: str = Field(min_length=8)
     name: str
     invitation_code: str
+
+
+class PinLoginRequest(BaseModel):
+    child_name: str
+    family_name: str
+    pin: str

@@ -22,6 +22,8 @@ import {
 import { useLogout, useFamilyId } from '../hooks/useAuth';
 import { useChildren } from '../hooks/useChildren';
 import { useDashboardWebSocket } from '../hooks/useWebSocket';
+import { NotificationContext, useNotificationState } from '../hooks/useNotifications';
+import NotificationToast from './NotificationToast';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -30,7 +32,16 @@ export default function Layout() {
   const navigate = useNavigate();
   const familyId = useFamilyId();
   const { data: children } = useChildren(familyId);
-  const { isConnected } = useDashboardWebSocket();
+  const notificationState = useNotificationState();
+  const { isConnected } = useDashboardWebSocket({
+    onNotification: (data) => {
+      notificationState.addNotification({
+        title: data.title,
+        message: data.message,
+        category: data.category as 'info' | 'quest' | 'tan' | 'device',
+      });
+    },
+  });
 
   const navLinkClasses = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
@@ -47,7 +58,9 @@ export default function Layout() {
     }`;
 
   return (
+    <NotificationContext.Provider value={notificationState}>
     <div className="flex h-screen overflow-hidden bg-slate-50">
+      <NotificationToast />
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -245,5 +258,6 @@ export default function Layout() {
         </main>
       </div>
     </div>
+    </NotificationContext.Provider>
   );
 }

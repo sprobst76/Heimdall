@@ -27,7 +27,7 @@ from app.schemas.agent import (
 from app.services.connection_manager import connection_manager
 from app.services.quest_service import check_auto_detect_quests
 from app.services.rule_engine import get_current_rules
-from app.services.rule_push_service import notify_parent_dashboard, push_rules_to_child_devices
+from app.services.rule_push_service import notify_parent_dashboard, notify_parent_event, push_rules_to_child_devices
 
 router = APIRouter(prefix="/agent", tags=["Device Agent"])
 
@@ -182,6 +182,13 @@ async def websocket_endpoint(
         # Notify parent portal about device coming online
         if family_id:
             await notify_parent_dashboard(family_id, device.child_id, "device_online")
+            await notify_parent_event(
+                family_id,
+                "Gerät online",
+                f"{device.name or 'Unbekanntes Gerät'} ist jetzt verbunden",
+                "device",
+                device.child_id,
+            )
 
         # Message loop
         while True:
@@ -256,3 +263,10 @@ async def websocket_endpoint(
             # Notify parent portal about device going offline
             if family_id:
                 await notify_parent_dashboard(family_id, device.child_id, "device_offline")
+                await notify_parent_event(
+                    family_id,
+                    "Gerät offline",
+                    f"{device.name or 'Unbekanntes Gerät'} wurde getrennt",
+                    "device",
+                    device.child_id,
+                )

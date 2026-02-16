@@ -2,11 +2,13 @@
 
 Helper functions to push updated rules to connected devices when parent
 makes changes to time rules, TANs, app groups, or device couplings.
-Also notifies parent portal WebSockets about dashboard invalidations.
+Also notifies parent portal WebSockets about dashboard invalidations
+and sends real-time notification events (toasts).
 """
 
 import logging
 import uuid
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -99,3 +101,33 @@ async def notify_parent_dashboard(
 
     message = {"type": "invalidate", "keys": keys, "event": event_type}
     return await connection_manager.notify_parents(family_id, message)
+
+
+async def notify_parent_event(
+    family_id: uuid.UUID,
+    title: str,
+    message: str,
+    category: str = "info",
+    child_id: uuid.UUID | None = None,
+) -> int:
+    """Send a visible notification event to parent portal WebSockets.
+
+    Categories: info, quest, tan, device.
+    Returns the count of parent connections notified.
+    """
+    payload = {
+        "type": "notification",
+        "title": title,
+        "message": message,
+        "category": category,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    if child_id is not None:
+        payload["child_id"] = str(child_id)
+
+    count = await connection_manager.notify_parents(family_id, payload)
+    logger.info(
+        "Sent notification to %d parents (family %s): %s",
+        count, family_id, title,
+    )
+    return count

@@ -68,6 +68,23 @@ class ApiService {
     return data;
   }
 
+  Future<Map<String, dynamic>> loginWithPin(String childName, String familyName, String pin) async {
+    final response = await _dio.post('/auth/login-pin', data: {
+      'child_name': childName,
+      'family_name': familyName,
+      'pin': pin,
+    });
+    final data = response.data;
+    await _storage.write(key: 'access_token', value: data['access_token']);
+    await _storage.write(key: 'refresh_token', value: data['refresh_token']);
+    return data;
+  }
+
+  Future<Map<String, dynamic>> getMe() async {
+    final response = await _dio.get('/auth/me');
+    return response.data;
+  }
+
   Future<void> logout() async {
     await _storage.delete(key: 'access_token');
     await _storage.delete(key: 'refresh_token');

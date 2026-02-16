@@ -39,6 +39,24 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> loginWithPin(String childName, String familyName, String pin) async {
+    try {
+      await _api.loginWithPin(childName, familyName, pin);
+      _isLoggedIn = true;
+      // Fetch user info to get child_id/family_id/name
+      final me = await _api.getMe();
+      _childId = me['id'];
+      _familyId = me['family_id'];
+      _childName = me['name'];
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoggedIn = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   void setChildInfo(String childId, String familyId, String name) {
     _childId = childId;
     _familyId = familyId;

@@ -32,7 +32,7 @@ from app.services.quest_service import (
     review_quest,
     submit_proof,
 )
-from app.services.rule_push_service import notify_parent_dashboard
+from app.services.rule_push_service import notify_parent_dashboard, notify_parent_event
 
 router = APIRouter(tags=["Quests"])
 
@@ -350,6 +350,21 @@ async def submit_quest_proof(
 
     instance = await submit_proof(db, instance, body.proof_type, body.proof_url)
     await notify_parent_dashboard(child_obj.family_id, child_id, "quest_proof")
+
+    # Load template name for notification
+    tmpl_result = await db.execute(
+        select(QuestTemplate).where(QuestTemplate.id == instance.template_id)
+    )
+    tmpl = tmpl_result.scalar_one_or_none()
+    quest_name = tmpl.name if tmpl else "Quest"
+    await notify_parent_event(
+        child_obj.family_id,
+        "Quest eingereicht",
+        f"{child_obj.name}: {quest_name}",
+        "quest",
+        child_id,
+    )
+
     return instance
 
 

@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../main.dart';
 import '../providers/auth_provider.dart';
 
+enum LoginMode { pin, email }
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -12,8 +14,17 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
+
+  // Email login fields
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
+  // PIN login fields
+  final _familyNameController = TextEditingController();
+  final _childNameController = TextEditingController();
+  final _pinController = TextEditingController();
+
+  LoginMode _mode = LoginMode.pin;
   bool _loading = false;
   bool _demoMode = false;
   String? _error;
@@ -22,11 +33,14 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _familyNameController.dispose();
+    _childNameController.dispose();
+    _pinController.dispose();
     super.dispose();
   }
 
   Future<void> _login() async {
-    // Im Demo-Modus: App mit MockApiService komplett neu aufbauen
+    // Demo mode
     if (_demoMode) {
       HeimdallRoot.startDemoMode();
       return;
@@ -40,18 +54,33 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     final auth = context.read<AuthProvider>();
-    final success = await auth.login(
-      _emailController.text.trim(),
-      _passwordController.text,
-    );
+    bool success;
+
+    if (_mode == LoginMode.pin) {
+      success = await auth.loginWithPin(
+        _childNameController.text.trim(),
+        _familyNameController.text.trim(),
+        _pinController.text,
+      );
+      if (!success && mounted) {
+        setState(() {
+          _error = 'Anmeldung fehlgeschlagen. Bitte prüfe Familienname, Name und PIN.';
+        });
+      }
+    } else {
+      success = await auth.login(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+      if (!success && mounted) {
+        setState(() {
+          _error = 'Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.';
+        });
+      }
+    }
 
     if (mounted) {
-      setState(() {
-        _loading = false;
-        if (!success) {
-          _error = 'Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten.';
-        }
-      });
+      setState(() => _loading = false);
     }
   }
 
@@ -87,46 +116,126 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(height: 48),
+                const SizedBox(height: 32),
+
+                // Login mode toggle
+                SegmentedButton<LoginMode>(
+                  segments: const [
+                    ButtonSegment(
+                      value: LoginMode.pin,
+                      label: Text('PIN'),
+                      icon: Icon(Icons.pin_outlined),
+                    ),
+                    ButtonSegment(
+                      value: LoginMode.email,
+                      label: Text('E-Mail'),
+                      icon: Icon(Icons.email_outlined),
+                    ),
+                  ],
+                  selected: {_mode},
+                  onSelectionChanged: (Set<LoginMode> selected) {
+                    setState(() {
+                      _mode = selected.first;
+                      _error = null;
+                    });
+                  },
+                ),
+                const SizedBox(height: 24),
+
                 Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      TextFormField(
-                        controller: _emailController,
-                        decoration: const InputDecoration(
-                          labelText: 'E-Mail',
-                          prefixIcon: Icon(Icons.email_outlined),
-                          border: OutlineInputBorder(),
+                      if (_mode == LoginMode.pin) ...[
+                        // PIN login fields
+                        TextFormField(
+                          controller: _familyNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Familienname',
+                            prefixIcon: Icon(Icons.family_restroom),
+                            border: OutlineInputBorder(),
+                          ),
+                          textCapitalization: TextCapitalization.words,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Bitte Familienname eingeben';
+                            }
+                            return null;
+                          },
                         ),
-                        keyboardType: TextInputType.emailAddress,
-                        autofillHints: const [AutofillHints.email],
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Bitte E-Mail eingeben';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _passwordController,
-                        decoration: const InputDecoration(
-                          labelText: 'Passwort',
-                          prefixIcon: Icon(Icons.lock_outlined),
-                          border: OutlineInputBorder(),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _childNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Dein Name',
+                            prefixIcon: Icon(Icons.person_outlined),
+                            border: OutlineInputBorder(),
+                          ),
+                          textCapitalization: TextCapitalization.words,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Bitte deinen Namen eingeben';
+                            }
+                            return null;
+                          },
                         ),
-                        obscureText: true,
-                        autofillHints: const [AutofillHints.password],
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Bitte Passwort eingeben';
-                          }
-                          return null;
-                        },
-                        onFieldSubmitted: (_) => _login(),
-                      ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _pinController,
+                          decoration: const InputDecoration(
+                            labelText: 'PIN',
+                            prefixIcon: Icon(Icons.lock_outlined),
+                            border: OutlineInputBorder(),
+                          ),
+                          obscureText: true,
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Bitte PIN eingeben';
+                            }
+                            return null;
+                          },
+                          onFieldSubmitted: (_) => _login(),
+                        ),
+                      ] else ...[
+                        // Email login fields
+                        TextFormField(
+                          controller: _emailController,
+                          decoration: const InputDecoration(
+                            labelText: 'E-Mail',
+                            prefixIcon: Icon(Icons.email_outlined),
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          autofillHints: const [AutofillHints.email],
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Bitte E-Mail eingeben';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _passwordController,
+                          decoration: const InputDecoration(
+                            labelText: 'Passwort',
+                            prefixIcon: Icon(Icons.lock_outlined),
+                            border: OutlineInputBorder(),
+                          ),
+                          obscureText: true,
+                          autofillHints: const [AutofillHints.password],
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Bitte Passwort eingeben';
+                            }
+                            return null;
+                          },
+                          onFieldSubmitted: (_) => _login(),
+                        ),
+                      ],
+
                       if (_error != null) ...[
                         const SizedBox(height: 12),
                         Container(
@@ -197,4 +306,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-

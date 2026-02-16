@@ -8,7 +8,11 @@ interface WebSocketMessage {
   [key: string]: unknown;
 }
 
-export function useDashboardWebSocket() {
+interface DashboardWebSocketOptions {
+  onNotification?: (data: { title: string; message: string; category: string }) => void;
+}
+
+export function useDashboardWebSocket(options?: DashboardWebSocketOptions) {
   const queryClient = useQueryClient();
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
@@ -16,6 +20,8 @@ export function useDashboardWebSocket() {
   const reconnectDelayRef = useRef(1000);
   const mountedRef = useRef(true);
   const shouldReconnectRef = useRef(true);
+  const onNotificationRef = useRef(options?.onNotification);
+  onNotificationRef.current = options?.onNotification;
 
   const connect = useCallback(() => {
     const token = localStorage.getItem('access_token');
@@ -50,6 +56,12 @@ export function useDashboardWebSocket() {
             for (const key of data.keys) {
               queryClient.invalidateQueries({ queryKey: key });
             }
+          } else if (data.type === 'notification' && onNotificationRef.current) {
+            onNotificationRef.current({
+              title: data.title as string,
+              message: data.message as string,
+              category: data.category as string,
+            });
           }
         } catch {
           // Ignore malformed messages

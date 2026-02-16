@@ -15,7 +15,7 @@ from app.database import get_db
 from app.models.tan import TAN
 from app.models.user import User
 from app.schemas.tan import TANCreate, TANRedeemRequest, TANResponse
-from app.services.rule_push_service import notify_parent_dashboard, notify_tan_activated, push_rules_to_child_devices
+from app.services.rule_push_service import notify_parent_dashboard, notify_parent_event, notify_tan_activated, push_rules_to_child_devices
 from app.services.tan_service import generate_tan_code, redeem_tan, validate_tan_redemption
 
 router = APIRouter(prefix="/children/{child_id}/tans", tags=["TANs"])
@@ -151,6 +151,13 @@ async def redeem_tan_endpoint(
 
     # Notify parent dashboard
     await notify_parent_dashboard(child_obj.family_id, child_id, "tan_redeemed")
+    await notify_parent_event(
+        child_obj.family_id,
+        "TAN eingelöst",
+        f"{child_obj.name}: {tan.code}",
+        "tan",
+        child_id,
+    )
 
     return tan
 

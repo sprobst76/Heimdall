@@ -10,7 +10,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from jose import JWTError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -26,8 +26,10 @@ from app.models.family import Family
 from app.models.invitation import FamilyInvitation
 from app.models.user import RefreshToken, User
 from app.core.dependencies import get_current_user
+
 from app.schemas.auth import (
     LoginRequest,
+    PinLoginRequest,
     RefreshRequest,
     RegisterRequest,
     RegisterWithInvitationRequest,
@@ -272,5 +274,54 @@ async def register_with_invitation(
     invitation.used_by = user.id
     invitation.used_at = now
     await db.flush()
+
+    return await _create_tokens_for_user(db, user)
+
+
+@router.post("/login-pin", response_model=TokenResponse)
+async def login_pin(
+    body: PinLoginRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Authenticate a child user with family name + child name + PIN."""
+    # Find family by name (case-insensitive)
+    result = await db.execute(
+        select(Family).where(func.lower(Family.name) == body.family_name.strip().lower())
+    )
+    family = result.scalar_one_or_none()
+    if family is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kind nicht gefunden",
+        )
+
+    # Find child by name in family
+    result = await db.execute(
+        select(User).where(
+            User.family_id == family.id,
+            func.lower(User.name) == body.child_name.strip().lower(),
+            User.role == "child",
+        )
+    )
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kind nicht gefunden",
+        )
+
+    # Check PIN is set
+    if user.pin_hash is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Kein PIN gesetzt — bitte Eltern kontaktieren",
+        )
+
+    # Verify PIN
+    if not verify_password(body.pin, user.pin_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Ungültige PIN",
+        )
 
     return await _create_tokens_for_user(db, user)
