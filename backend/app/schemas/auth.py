@@ -35,3 +35,14 @@ class PinLoginRequest(BaseModel):
     child_name: str
     family_name: str
     pin: str
+
+
+class ProfileUpdate(BaseModel):
+    name: str | None = None
+    email: EmailStr | None = None
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
+    new_password_confirm: str = Field(min_length=8)

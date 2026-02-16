@@ -447,6 +447,17 @@ export interface RegisterWithInvitationRequest {
   invitation_code: string;
 }
 
+export interface ProfileUpdate {
+  name?: string;
+  email?: string;
+}
+
+export interface PasswordChangeRequest {
+  current_password: string;
+  new_password: string;
+  new_password_confirm: string;
+}
+
 // ── Analytics ────────────────────────────────────────────────────────────────
 
 export interface GroupUsage {

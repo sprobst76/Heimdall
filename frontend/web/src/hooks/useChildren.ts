@@ -50,3 +50,10 @@ export function useDeleteChild(familyId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['children', familyId] }),
   });
 }
+
+export function useResetChildPin(familyId: string) {
+  return useMutation({
+    mutationFn: ({ childId, pin }: { childId: string; pin: string }) =>
+      api.put(`/families/${familyId}/children/${childId}/pin`, { pin }),
+  });
+}

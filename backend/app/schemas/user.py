@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserBase(BaseModel):
@@ -20,6 +20,10 @@ class ChildUpdate(BaseModel):
     name: str | None = None
     age: int | None = None
     avatar_url: str | None = None
+
+
+class ChildPinReset(BaseModel):
+    pin: str = Field(min_length=4, max_length=20)
 
 
 class UserResponse(UserBase):

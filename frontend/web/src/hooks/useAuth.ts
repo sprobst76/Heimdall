@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/client';
-import type { LoginRequest, RegisterRequest, RegisterWithInvitationRequest, TokenResponse, User } from '../types';
+import type { LoginRequest, PasswordChangeRequest, ProfileUpdate, RegisterRequest, RegisterWithInvitationRequest, TokenResponse, User } from '../types';
 
 export function useLogin() {
   return useMutation({
@@ -62,6 +62,24 @@ export function useCurrentUser() {
 export function useFamilyId(): string {
   const { data: user } = useCurrentUser();
   return user?.family_id ?? '';
+}
+
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: ProfileUpdate) => {
+      const res = await api.put<User>('/auth/profile', data);
+      return res.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['auth', 'me'] }),
+  });
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (data: PasswordChangeRequest) =>
+      api.put('/auth/password', data),
+  });
 }
 
 export function isAuthenticated(): boolean {

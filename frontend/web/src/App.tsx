@@ -15,6 +15,7 @@ import DevicesPage from './pages/DevicesPage';
 import UsageRewardsPage from './pages/UsageRewardsPage';
 import FamilySettingsPage from './pages/FamilySettingsPage';
 import HolidaysPage from './pages/HolidaysPage';
+import ProfilePage from './pages/ProfilePage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,6 +51,7 @@ export default function App() {
             <Route path="usage-rewards/:childId" element={<UsageRewardsPage />} />
             <Route path="holidays" element={<HolidaysPage />} />
             <Route path="family" element={<FamilySettingsPage />} />
+            <Route path="profile" element={<ProfilePage />} />
             <Route path="analytics/:childId" element={<AnalyticsPage />} />
           </Route>
         </Routes>

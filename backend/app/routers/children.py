@@ -14,7 +14,7 @@ from app.core.dependencies import get_current_user, require_family_member, requi
 from app.core.security import get_password_hash
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import ChildCreate, ChildUpdate, UserResponse
+from app.schemas.user import ChildCreate, ChildPinReset, ChildUpdate, UserResponse
 
 router = APIRouter(prefix="/families/{family_id}/children", tags=["Children"])
 
@@ -158,5 +158,40 @@ async def delete_child(
         )
 
     await db.delete(child)
+    await db.flush()
+    return None
+
+
+@router.put("/{child_id}/pin", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_child_pin(
+    family_id: uuid.UUID,
+    child_id: uuid.UUID,
+    body: ChildPinReset,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: User = Depends(require_parent),
+):
+    """Reset a child's PIN. Requires parent role."""
+    if current_user.family_id != family_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sie sind kein Mitglied dieser Familie",
+        )
+
+    result = await db.execute(
+        select(User).where(
+            User.id == child_id,
+            User.family_id == family_id,
+            User.role == "child",
+        )
+    )
+    child = result.scalar_one_or_none()
+
+    if child is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kind nicht gefunden",
+        )
+
+    child.pin_hash = get_password_hash(body.pin)
     await db.flush()
     return None

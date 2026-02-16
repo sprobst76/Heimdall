@@ -25,11 +25,12 @@ from app.database import get_db
 from app.models.family import Family
 from app.models.invitation import FamilyInvitation
 from app.models.user import RefreshToken, User
-from app.core.dependencies import get_current_user
-
+from app.core.dependencies import get_current_user, require_parent
 from app.schemas.auth import (
     LoginRequest,
+    PasswordChangeRequest,
     PinLoginRequest,
+    ProfileUpdate,
     RefreshRequest,
     RegisterRequest,
     RegisterWithInvitationRequest,
@@ -47,6 +48,8 @@ async def get_me(current_user: User = Depends(get_current_user)):
         "family_id": str(current_user.family_id),
         "name": current_user.name,
         "role": current_user.role,
+        "email": current_user.email,
+        "created_at": current_user.created_at.isoformat(),
     }
 
 
@@ -325,3 +328,61 @@ async def login_pin(
         )
 
     return await _create_tokens_for_user(db, user)
+
+
+@router.put("/profile")
+async def update_profile(
+    body: ProfileUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: User = Depends(require_parent),
+):
+    """Update the current user's profile (name, email)."""
+    if body.name is not None:
+        current_user.name = body.name
+
+    if body.email is not None and body.email != current_user.email:
+        # Check uniqueness
+        existing = await db.execute(select(User).where(User.email == body.email))
+        if existing.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="E-Mail bereits vergeben",
+            )
+        current_user.email = body.email
+
+    await db.flush()
+
+    return {
+        "id": str(current_user.id),
+        "family_id": str(current_user.family_id),
+        "name": current_user.name,
+        "role": current_user.role,
+        "email": current_user.email,
+        "created_at": current_user.created_at.isoformat(),
+    }
+
+
+@router.put("/password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(
+    body: PasswordChangeRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: User = Depends(require_parent),
+):
+    """Change the current user's password."""
+    if body.new_password != body.new_password_confirm:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Passwörter stimmen nicht überein",
+        )
+
+    if current_user.password_hash is None or not verify_password(
+        body.current_password, current_user.password_hash
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Aktuelles Passwort ist falsch",
+        )
+
+    current_user.password_hash = get_password_hash(body.new_password)
+    await db.flush()
+    return None
