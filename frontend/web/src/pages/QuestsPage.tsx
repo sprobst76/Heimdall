@@ -14,6 +14,14 @@ import {
   ChevronLeft,
   Pencil,
   Trash2,
+  Home,
+  BookOpen,
+  Dumbbell,
+  Palette,
+  Users,
+  Star,
+  Minus,
+  type LucideIcon,
 } from 'lucide-react';
 import { useChildren } from '../hooks/useChildren';
 import {
@@ -33,10 +41,13 @@ import type {
   QuestReview,
 } from '../types';
 
-const CATEGORY_OPTIONS = [
-  { value: 'Haushalt', label: 'Haushalt' },
-  { value: 'Schule', label: 'Schule' },
-  { value: 'Bonus', label: 'Bonus' },
+const CATEGORY_OPTIONS: { value: string; label: string; icon: LucideIcon }[] = [
+  { value: 'Haushalt', label: 'Haushalt', icon: Home },
+  { value: 'Schule', label: 'Schule', icon: BookOpen },
+  { value: 'Sport', label: 'Sport', icon: Dumbbell },
+  { value: 'Kreativ', label: 'Kreativ', icon: Palette },
+  { value: 'Sozial', label: 'Sozial', icon: Users },
+  { value: 'Spezial', label: 'Spezial', icon: Star },
 ];
 
 const PROOF_TYPE_OPTIONS = [
@@ -52,6 +63,20 @@ const RECURRENCE_OPTIONS = [
   { value: 'weekly', label: 'Wochentlich' },
   { value: 'school_days', label: 'Schultage' },
   { value: 'once', label: 'Einmalig' },
+];
+
+const SUBJECT_OPTIONS = [
+  { value: 'Mathematik', label: 'Mathematik' },
+  { value: 'Deutsch', label: 'Deutsch' },
+  { value: 'Englisch', label: 'Englisch' },
+  { value: 'Sachkunde', label: 'Sachkunde' },
+  { value: 'Sonstiges', label: 'Sonstiges' },
+];
+
+const DIFFICULTY_OPTIONS = [
+  { value: 'easy', label: 'Leicht' },
+  { value: 'medium', label: 'Mittel' },
+  { value: 'hard', label: 'Schwer' },
 ];
 
 function statusBadge(status: string): { label: string; color: string } {
@@ -71,9 +96,9 @@ function statusBadge(status: string): { label: string; color: string } {
   }
 }
 
-function categoryLabel(cat: string): string {
+function categoryInfo(cat: string): { label: string; icon: LucideIcon } {
   const found = CATEGORY_OPTIONS.find((o) => o.value === cat);
-  return found ? found.label : cat;
+  return found ? { label: found.label, icon: found.icon } : { label: cat, icon: Star };
 }
 
 function proofTypeLabel(pt: string): string {
@@ -84,6 +109,19 @@ function proofTypeLabel(pt: string): string {
 function recurrenceLabel(r: string): string {
   const found = RECURRENCE_OPTIONS.find((o) => o.value === r);
   return found ? found.label : r;
+}
+
+function difficultyBadge(d: string): { label: string; color: string } {
+  switch (d) {
+    case 'easy':
+      return { label: 'Leicht', color: 'bg-emerald-100 text-emerald-700' };
+    case 'medium':
+      return { label: 'Mittel', color: 'bg-amber-100 text-amber-700' };
+    case 'hard':
+      return { label: 'Schwer', color: 'bg-red-100 text-red-700' };
+    default:
+      return { label: d, color: 'bg-slate-100 text-slate-600' };
+  }
 }
 
 export default function QuestsPage() {
@@ -111,6 +149,9 @@ export default function QuestsPage() {
   const assignQuest = useAssignQuest(childId ?? '');
   const reviewQuest = useReviewQuest(childId ?? '');
 
+  // Filter state
+  const [filterCategory, setFilterCategory] = useState<string | null>(null);
+
   // Template form state
   const [showForm, setShowForm] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<QuestTemplate | null>(
@@ -129,6 +170,10 @@ export default function QuestsPage() {
   const [formAutoDetectMinutes, setFormAutoDetectMinutes] = useState('');
   const [formAiVerify, setFormAiVerify] = useState(false);
   const [formAiPrompt, setFormAiPrompt] = useState('');
+  const [formSubject, setFormSubject] = useState('');
+  const [formEstimatedMinutes, setFormEstimatedMinutes] = useState('');
+  const [formDifficulty, setFormDifficulty] = useState('');
+  const [formChecklistItems, setFormChecklistItems] = useState<string[]>([]);
   const [formError, setFormError] = useState('');
 
   // Review state
@@ -139,6 +184,11 @@ export default function QuestsPage() {
 
   // Assign state
   const [showAssign, setShowAssign] = useState(false);
+
+  // Filtered templates
+  const filteredTemplates = templates?.filter(
+    (t) => !filterCategory || t.category === filterCategory
+  );
 
   function openCreateForm() {
     setEditingTemplate(null);
@@ -153,6 +203,10 @@ export default function QuestsPage() {
     setFormAutoDetectMinutes('');
     setFormAiVerify(false);
     setFormAiPrompt('');
+    setFormSubject('');
+    setFormEstimatedMinutes('');
+    setFormDifficulty('');
+    setFormChecklistItems([]);
     setFormError('');
     setShowForm(true);
   }
@@ -170,6 +224,10 @@ export default function QuestsPage() {
     setFormAutoDetectMinutes(template.auto_detect_minutes != null ? String(template.auto_detect_minutes) : '');
     setFormAiVerify(template.ai_verify);
     setFormAiPrompt(template.ai_prompt ?? '');
+    setFormSubject(template.subject ?? '');
+    setFormEstimatedMinutes(template.estimated_minutes != null ? String(template.estimated_minutes) : '');
+    setFormDifficulty(template.difficulty ?? '');
+    setFormChecklistItems(template.checklist_items ?? []);
     setFormError('');
     setShowForm(true);
   }
@@ -196,39 +254,35 @@ export default function QuestsPage() {
 
     const streakVal = parseInt(formStreakThreshold);
     const autoMinVal = parseInt(formAutoDetectMinutes);
+    const estMin = parseInt(formEstimatedMinutes);
+
+    const commonFields = {
+      name: formName.trim(),
+      description: formDescription.trim() || null,
+      category: formCategory,
+      reward_minutes: reward,
+      proof_type: formProofType,
+      recurrence: formRecurrence,
+      streak_threshold: streakVal > 0 ? streakVal : null,
+      auto_detect_app: formProofType === 'auto' && formAutoDetectApp.trim() ? formAutoDetectApp.trim() : null,
+      auto_detect_minutes: formProofType === 'auto' && autoMinVal > 0 ? autoMinVal : null,
+      ai_verify: formProofType === 'photo' ? formAiVerify : false,
+      ai_prompt: formAiVerify && formAiPrompt.trim() ? formAiPrompt.trim() : null,
+      subject: formCategory === 'Schule' && formSubject ? formSubject : null,
+      estimated_minutes: formCategory === 'Schule' && estMin > 0 ? estMin : null,
+      difficulty: formCategory === 'Schule' && formDifficulty ? formDifficulty : null,
+      checklist_items: formProofType === 'checklist' && formChecklistItems.filter(Boolean).length > 0
+        ? formChecklistItems.filter(Boolean) : null,
+    };
 
     try {
       if (editingTemplate) {
         await updateTemplate.mutateAsync({
           questId: editingTemplate.id,
-          data: {
-            name: formName.trim(),
-            description: formDescription.trim() || null,
-            category: formCategory,
-            reward_minutes: reward,
-            proof_type: formProofType,
-            recurrence: formRecurrence,
-            streak_threshold: streakVal > 0 ? streakVal : null,
-            auto_detect_app: formProofType === 'auto' && formAutoDetectApp.trim() ? formAutoDetectApp.trim() : null,
-            auto_detect_minutes: formProofType === 'auto' && autoMinVal > 0 ? autoMinVal : null,
-            ai_verify: formProofType === 'photo' ? formAiVerify : false,
-            ai_prompt: formAiVerify && formAiPrompt.trim() ? formAiPrompt.trim() : null,
-          },
+          data: commonFields,
         });
       } else {
-        const payload: QuestTemplateCreate = {
-          name: formName.trim(),
-          description: formDescription.trim() || null,
-          category: formCategory,
-          reward_minutes: reward,
-          proof_type: formProofType,
-          recurrence: formRecurrence,
-          auto_detect_app: formProofType === 'auto' && formAutoDetectApp.trim() ? formAutoDetectApp.trim() : null,
-          auto_detect_minutes: formProofType === 'auto' && autoMinVal > 0 ? autoMinVal : null,
-          ai_verify: formProofType === 'photo' ? formAiVerify : false,
-          ai_prompt: formAiVerify && formAiPrompt.trim() ? formAiPrompt.trim() : null,
-        };
-        if (streakVal > 0) payload.streak_threshold = streakVal;
+        const payload: QuestTemplateCreate = commonFields;
         await createTemplate.mutateAsync(payload);
       }
       closeForm();
@@ -352,6 +406,37 @@ export default function QuestsPage() {
           </h2>
         </div>
 
+        {/* Category filter tabs */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          <button
+            onClick={() => setFilterCategory(null)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+              filterCategory === null
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Alle
+          </button>
+          {CATEGORY_OPTIONS.map((cat) => {
+            const Icon = cat.icon;
+            return (
+              <button
+                key={cat.value}
+                onClick={() => setFilterCategory(filterCategory === cat.value ? null : cat.value)}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                  filterCategory === cat.value
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Loading */}
         {templatesLoading && (
           <div className="flex items-center justify-center py-12">
@@ -373,137 +458,167 @@ export default function QuestsPage() {
         {/* Empty state */}
         {!templatesLoading &&
           !templatesError &&
-          templates &&
-          templates.length === 0 && (
+          filteredTemplates &&
+          filteredTemplates.length === 0 && (
             <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white py-16">
               <Trophy className="mb-4 h-12 w-12 text-slate-300" />
               <h3 className="text-lg font-semibold text-slate-700">
-                Keine Quest-Vorlagen vorhanden
+                {filterCategory ? `Keine Vorlagen in "${filterCategory}"` : 'Keine Quest-Vorlagen vorhanden'}
               </h3>
               <p className="mt-1 text-sm text-slate-500">
-                Erstellen Sie die erste Quest-Vorlage fur Ihre Familie.
+                {filterCategory ? 'Erstellen Sie eine neue Vorlage oder wahlen Sie eine andere Kategorie.' : 'Erstellen Sie die erste Quest-Vorlage fur Ihre Familie.'}
               </p>
             </div>
           )}
 
         {/* Templates list */}
         <div className="space-y-3">
-          {templates?.map((template) => (
-            <div
-              key={template.id}
-              className={`rounded-xl border bg-white p-5 shadow-sm transition-all ${
-                template.active
-                  ? 'border-slate-200'
-                  : 'border-slate-200 opacity-60'
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-base font-semibold text-slate-900">
-                      {template.name}
-                    </h3>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        template.active
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-slate-100 text-slate-500'
-                      }`}
-                    >
-                      {template.active ? 'Aktiv' : 'Inaktiv'}
-                    </span>
-                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">
-                      {categoryLabel(template.category)}
-                    </span>
-                  </div>
-
-                  {template.description && (
-                    <p className="mt-1 text-sm text-slate-500">
-                      {template.description}
-                    </p>
-                  )}
-
-                  <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-600">
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5 text-slate-400" />
-                      {template.reward_minutes} Min. Belohnung
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Eye className="h-3.5 w-3.5 text-slate-400" />
-                      {proofTypeLabel(template.proof_type)}
-                    </span>
-                    <span className="text-xs text-slate-400">
-                      {recurrenceLabel(template.recurrence)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handleAssign(template.id)}
-                    disabled={assignQuest.isPending || !template.active}
-                    className="rounded-lg p-2 text-indigo-500 transition-colors hover:bg-indigo-50 hover:text-indigo-700 disabled:opacity-50"
-                    title="Zuweisen"
-                  >
-                    <Send className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleToggleActive(template)}
-                    className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                    title={template.active ? 'Deaktivieren' : 'Aktivieren'}
-                  >
-                    {template.active ? (
-                      <CheckCircle className="h-4 w-4 text-emerald-500" />
-                    ) : (
-                      <XCircle className="h-4 w-4" />
-                    )}
-                  </button>
-                  <button
-                    onClick={() => openEditForm(template)}
-                    className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                    title="Bearbeiten"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => setDeleteConfirm(template.id)}
-                    className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                    title="Loschen"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Delete confirm */}
-              {deleteConfirm === template.id && (
-                <div className="mt-4 flex items-center justify-between rounded-lg bg-red-50 px-4 py-3">
-                  <p className="text-sm text-red-700">
-                    Quest-Vorlage wirklich loschen?
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setDeleteConfirm(null)}
-                      className="rounded-md px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
-                    >
-                      Abbrechen
-                    </button>
-                    <button
-                      onClick={() => handleDelete(template.id)}
-                      disabled={deleteTemplate.isPending}
-                      className="flex items-center gap-1 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
-                    >
-                      {deleteTemplate.isPending && (
-                        <Loader2 className="h-3 w-3 animate-spin" />
+          {filteredTemplates?.map((template) => {
+            const catInfo = categoryInfo(template.category);
+            const CatIcon = catInfo.icon;
+            return (
+              <div
+                key={template.id}
+                className={`rounded-xl border bg-white p-5 shadow-sm transition-all ${
+                  template.active
+                    ? 'border-slate-200'
+                    : 'border-slate-200 opacity-60'
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-base font-semibold text-slate-900">
+                        {template.name}
+                      </h3>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          template.active
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {template.active ? 'Aktiv' : 'Inaktiv'}
+                      </span>
+                      <span className="flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">
+                        <CatIcon className="h-3 w-3" />
+                        {catInfo.label}
+                      </span>
+                      {template.difficulty && (
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${difficultyBadge(template.difficulty).color}`}>
+                          {difficultyBadge(template.difficulty).label}
+                        </span>
                       )}
-                      Loschen
+                    </div>
+
+                    {template.description && (
+                      <p className="mt-1 text-sm text-slate-500">
+                        {template.description}
+                      </p>
+                    )}
+
+                    <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-600">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5 text-slate-400" />
+                        {template.reward_minutes} Min. Belohnung
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Eye className="h-3.5 w-3.5 text-slate-400" />
+                        {proofTypeLabel(template.proof_type)}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        {recurrenceLabel(template.recurrence)}
+                      </span>
+                      {template.subject && (
+                        <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-700">
+                          {template.subject}
+                        </span>
+                      )}
+                      {template.estimated_minutes && (
+                        <span className="text-xs text-slate-400">
+                          ~{template.estimated_minutes} Min. Aufwand
+                        </span>
+                      )}
+                    </div>
+
+                    {template.checklist_items && template.checklist_items.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {template.checklist_items.map((item, i) => (
+                          <span key={i} className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleAssign(template.id)}
+                      disabled={assignQuest.isPending || !template.active}
+                      className="rounded-lg p-2 text-indigo-500 transition-colors hover:bg-indigo-50 hover:text-indigo-700 disabled:opacity-50"
+                      title="Zuweisen"
+                    >
+                      <Send className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleToggleActive(template)}
+                      className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                      title={template.active ? 'Deaktivieren' : 'Aktivieren'}
+                    >
+                      {template.active ? (
+                        <CheckCircle className="h-4 w-4 text-emerald-500" />
+                      ) : (
+                        <XCircle className="h-4 w-4" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => openEditForm(template)}
+                      className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                      title="Bearbeiten"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm(template.id)}
+                      className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                      title="Loschen"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* Delete confirm */}
+                {deleteConfirm === template.id && (
+                  <div className="mt-4 flex items-center justify-between rounded-lg bg-red-50 px-4 py-3">
+                    <p className="text-sm text-red-700">
+                      Quest-Vorlage wirklich loschen?
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setDeleteConfirm(null)}
+                        className="rounded-md px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                      >
+                        Abbrechen
+                      </button>
+                      <button
+                        onClick={() => handleDelete(template.id)}
+                        disabled={deleteTemplate.isPending}
+                        className="flex items-center gap-1 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {deleteTemplate.isPending && (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        )}
+                        Loschen
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -651,26 +766,31 @@ export default function QuestsPage() {
               <div className="space-y-2">
                 {templates
                   ?.filter((t) => t.active)
-                  .map((template) => (
-                    <button
-                      key={template.id}
-                      onClick={() => handleAssign(template.id)}
-                      disabled={assignQuest.isPending}
-                      className="flex w-full items-center justify-between rounded-lg border border-slate-200 p-4 text-left transition-colors hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      <div>
-                        <h4 className="text-sm font-semibold text-slate-900">
-                          {template.name}
-                        </h4>
-                        <p className="text-xs text-slate-500">
-                          {categoryLabel(template.category)} &middot;{' '}
-                          {template.reward_minutes} Min. &middot;{' '}
-                          {recurrenceLabel(template.recurrence)}
-                        </p>
-                      </div>
-                      <Send className="h-4 w-4 text-indigo-500" />
-                    </button>
-                  ))}
+                  .map((template) => {
+                    const catInfo = categoryInfo(template.category);
+                    const CatIcon = catInfo.icon;
+                    return (
+                      <button
+                        key={template.id}
+                        onClick={() => handleAssign(template.id)}
+                        disabled={assignQuest.isPending}
+                        className="flex w-full items-center justify-between rounded-lg border border-slate-200 p-4 text-left transition-colors hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        <div>
+                          <h4 className="text-sm font-semibold text-slate-900">
+                            {template.name}
+                          </h4>
+                          <p className="flex items-center gap-1 text-xs text-slate-500">
+                            <CatIcon className="h-3 w-3" />
+                            {catInfo.label} &middot;{' '}
+                            {template.reward_minutes} Min. &middot;{' '}
+                            {recurrenceLabel(template.recurrence)}
+                          </p>
+                        </div>
+                        <Send className="h-4 w-4 text-indigo-500" />
+                      </button>
+                    );
+                  })}
               </div>
             )}
           </div>
@@ -829,6 +949,61 @@ export default function QuestsPage() {
                 </select>
               </div>
 
+              {/* Schulaufgaben fields (only for Schule category) */}
+              {formCategory === 'Schule' && (
+                <>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Fach
+                    </label>
+                    <select
+                      value={formSubject}
+                      onChange={(e) => setFormSubject(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    >
+                      <option value="">-- Kein Fach --</option>
+                      {SUBJECT_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-700">
+                        Geschatzte Zeit (Min.)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formEstimatedMinutes}
+                        onChange={(e) => setFormEstimatedMinutes(e.target.value)}
+                        placeholder="z.B. 30"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-700">
+                        Schwierigkeit
+                      </label>
+                      <select
+                        value={formDifficulty}
+                        onChange={(e) => setFormDifficulty(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      >
+                        <option value="">-- Keine --</option>
+                        {DIFFICULTY_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
+
               {/* Reward minutes */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">
@@ -862,6 +1037,49 @@ export default function QuestsPage() {
                   ))}
                 </select>
               </div>
+
+              {/* Checklist items (only when proof_type is 'checklist') */}
+              {formProofType === 'checklist' && (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Checklisten-Punkte
+                  </label>
+                  <div className="space-y-2">
+                    {formChecklistItems.map((item, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={item}
+                          onChange={(e) => {
+                            const updated = [...formChecklistItems];
+                            updated[index] = e.target.value;
+                            setFormChecklistItems(updated);
+                          }}
+                          placeholder={`Punkt ${index + 1}`}
+                          className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormChecklistItems(formChecklistItems.filter((_, i) => i !== index));
+                          }}
+                          className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setFormChecklistItems([...formChecklistItems, ''])}
+                      className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Punkt hinzufugen
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Recurrence */}
               <div>

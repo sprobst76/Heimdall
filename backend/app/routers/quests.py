@@ -121,6 +121,11 @@ async def create_quest_template(
         recurrence=body.recurrence,
         auto_detect_app=body.auto_detect_app,
         auto_detect_minutes=body.auto_detect_minutes,
+        streak_threshold=body.streak_threshold,
+        subject=body.subject,
+        estimated_minutes=body.estimated_minutes,
+        difficulty=body.difficulty,
+        checklist_items=body.checklist_items,
     )
     db.add(template)
     await db.flush()

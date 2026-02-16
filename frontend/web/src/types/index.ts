@@ -246,6 +246,10 @@ export interface QuestTemplate {
   auto_detect_app?: string | null;
   auto_detect_minutes?: number | null;
   streak_threshold?: number | null;
+  subject?: string | null;
+  estimated_minutes?: number | null;
+  difficulty?: string | null;
+  checklist_items?: string[] | null;
   active: boolean;
   created_at: string;
 }
@@ -263,6 +267,10 @@ export interface QuestTemplateCreate {
   auto_detect_app?: string | null;
   auto_detect_minutes?: number | null;
   streak_threshold?: number | null;
+  subject?: string | null;
+  estimated_minutes?: number | null;
+  difficulty?: string | null;
+  checklist_items?: string[] | null;
 }
 
 export interface QuestTemplateUpdate {
@@ -277,6 +285,10 @@ export interface QuestTemplateUpdate {
   auto_detect_app?: string | null;
   auto_detect_minutes?: number | null;
   streak_threshold?: number | null;
+  subject?: string | null;
+  estimated_minutes?: number | null;
+  difficulty?: string | null;
+  checklist_items?: string[] | null;
   active?: boolean;
 }
 

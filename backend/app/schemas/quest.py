@@ -17,6 +17,10 @@ class QuestTemplateCreate(BaseModel):
     auto_detect_app: str | None = None
     auto_detect_minutes: int | None = None
     streak_threshold: int | None = None
+    subject: str | None = None
+    estimated_minutes: int | None = None
+    difficulty: str | None = None
+    checklist_items: list[str] | None = None
 
 
 class QuestTemplateUpdate(BaseModel):
@@ -26,9 +30,16 @@ class QuestTemplateUpdate(BaseModel):
     reward_minutes: int | None = None
     proof_type: str | None = None
     ai_verify: bool | None = None
+    ai_prompt: str | None = None
     recurrence: str | None = None
     active: bool | None = None
     streak_threshold: int | None = None
+    auto_detect_app: str | None = None
+    auto_detect_minutes: int | None = None
+    subject: str | None = None
+    estimated_minutes: int | None = None
+    difficulty: str | None = None
+    checklist_items: list[str] | None = None
 
 
 class QuestTemplateResponse(BaseModel):
@@ -41,10 +52,15 @@ class QuestTemplateResponse(BaseModel):
     tan_groups: list[uuid.UUID] | None = None
     proof_type: str
     ai_verify: bool
+    ai_prompt: str | None = None
     recurrence: str
     auto_detect_app: str | None = None
     auto_detect_minutes: int | None = None
     streak_threshold: int | None = None
+    subject: str | None = None
+    estimated_minutes: int | None = None
+    difficulty: str | None = None
+    checklist_items: list[str] | None = None
     active: bool
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)

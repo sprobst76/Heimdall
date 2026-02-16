@@ -31,6 +31,10 @@ class QuestTemplate(Base):
     auto_detect_app: Mapped[str | None] = mapped_column(String(255), nullable=True)
     auto_detect_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     streak_threshold: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    subject: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    estimated_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    difficulty: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    checklist_items: Mapped[list | None] = mapped_column(JSON, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
