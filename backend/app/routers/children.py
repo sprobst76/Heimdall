@@ -119,9 +119,11 @@ async def update_child(
             detail="Child not found",
         )
 
+    _allowed = {"name", "age", "avatar_url"}
     update_data = body.model_dump(exclude_unset=True)
     for field, value in update_data.items():
-        setattr(child, field, value)
+        if field in _allowed:
+            setattr(child, field, value)
 
     await db.flush()
     await db.refresh(child)

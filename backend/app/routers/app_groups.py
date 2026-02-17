@@ -144,9 +144,11 @@ async def update_app_group(
             detail="App group not found",
         )
 
+    _allowed = {"name", "icon", "color", "category", "risk_level", "always_allowed", "tan_allowed", "max_tan_bonus_per_day"}
     update_data = body.model_dump(exclude_unset=True)
     for field, value in update_data.items():
-        setattr(group, field, value)
+        if field in _allowed:
+            setattr(group, field, value)
 
     await db.flush()
     await db.refresh(group)

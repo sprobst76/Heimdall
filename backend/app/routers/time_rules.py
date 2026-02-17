@@ -155,8 +155,10 @@ async def update_rule(
             for gl in update_data["group_limits"]
         ]
 
+    _allowed = {"name", "day_types", "time_windows", "daily_limit_minutes", "group_limits", "priority", "active", "valid_from", "valid_until"}
     for field, value in update_data.items():
-        setattr(rule, field, value)
+        if field in _allowed:
+            setattr(rule, field, value)
 
     await db.flush()
     await db.refresh(rule)

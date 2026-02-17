@@ -137,9 +137,11 @@ async def update_device(
             detail="Device not found",
         )
 
+    _allowed = {"name", "status"}
     update_data = body.model_dump(exclude_unset=True)
     for field, value in update_data.items():
-        setattr(device, field, value)
+        if field in _allowed:
+            setattr(device, field, value)
 
     await db.flush()
     await db.refresh(device)

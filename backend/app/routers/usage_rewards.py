@@ -157,8 +157,10 @@ async def update_usage_reward_rule(
             detail=f"Ungültiger Trigger-Typ. Erlaubt: {', '.join(VALID_TRIGGER_TYPES)}",
         )
 
+    _allowed = {"name", "trigger_type", "threshold_minutes", "target_group_id", "streak_days", "reward_minutes", "reward_group_ids", "active"}
     for key, value in update_data.items():
-        setattr(rule, key, value)
+        if key in _allowed:
+            setattr(rule, key, value)
 
     await db.commit()
     await db.refresh(rule)

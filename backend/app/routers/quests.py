@@ -193,9 +193,16 @@ async def update_quest_template(
             detail="Quest template not found",
         )
 
+    _allowed = {
+        "name", "description", "category", "reward_minutes", "proof_type",
+        "ai_verify", "ai_prompt", "recurrence", "active", "streak_threshold",
+        "auto_detect_app", "auto_detect_minutes", "subject",
+        "estimated_minutes", "difficulty", "checklist_items",
+    }
     update_data = body.model_dump(exclude_unset=True)
     for key, value in update_data.items():
-        setattr(template, key, value)
+        if key in _allowed:
+            setattr(template, key, value)
 
     await db.flush()
     await db.refresh(template)

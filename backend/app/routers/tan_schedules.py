@@ -153,8 +153,10 @@ async def update_tan_schedule(
             detail=f"Ungültiger TAN-Typ. Erlaubt: {', '.join(VALID_TAN_TYPES)}",
         )
 
+    _allowed = {"name", "recurrence", "tan_type", "value_minutes", "value_unlock_until", "scope_groups", "scope_devices", "expires_after_hours", "active"}
     for key, value in update_data.items():
-        setattr(schedule, key, value)
+        if key in _allowed:
+            setattr(schedule, key, value)
 
     await db.commit()
     await db.refresh(schedule)

@@ -67,9 +67,11 @@ async def update_family(
             detail="Family not found",
         )
 
+    _allowed = {"name", "timezone", "settings"}
     update_data = body.model_dump(exclude_unset=True)
     for field, value in update_data.items():
-        setattr(family, field, value)
+        if field in _allowed:
+            setattr(family, field, value)
 
     await db.flush()
     await db.refresh(family)

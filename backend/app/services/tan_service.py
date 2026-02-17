@@ -13,11 +13,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.app_group import AppGroup
 from app.models.tan import TAN
 
-# Mythological word list for TAN codes
+# Mythological word list for TAN codes (50 words × 1M digits = 50M combinations)
 WORD_LIST = [
     "HERO", "ODIN", "THOR", "LOKI", "FREYA", "FENRIR", "BALDUR", "SIGURD",
     "BRAGI", "IDUN", "NORNS", "AEGIR", "SKADI", "FRIGG", "VIDAR", "VALI",
-    "MAGNI", "MODI", "NJORD", "TYR",
+    "MAGNI", "MODI", "NJORD", "TYR", "HEIMDALL", "RAGNAR", "ASGARD", "BIFROST",
+    "HUGIN", "MUNIN", "SLEIPNIR", "GUNGNIR", "MJOLNIR", "YGGDRASIL",
+    "RUNE", "SAGA", "EDDA", "DRAUGR", "JOTUNN", "ALFHEIM", "MIDGARD",
+    "VANIR", "ULFR", "HRAFN", "STORM", "FROST", "BLADE", "SHIELD",
+    "RAVEN", "WOLF", "BEAR", "EAGLE", "FLAME", "STONE",
 ]
 
 # Default policy limits
@@ -28,9 +32,9 @@ BLACKOUT_END = time(6, 0)     # 06:00
 
 
 def _generate_code() -> str:
-    """Generate a TAN code like 'HERO-7749'."""
+    """Generate a TAN code like 'HERO-774923'."""
     word = random.choice(WORD_LIST)
-    digits = f"{random.randint(0, 9999):04d}"
+    digits = f"{random.randint(0, 999999):06d}"
     return f"{word}-{digits}"
 
 

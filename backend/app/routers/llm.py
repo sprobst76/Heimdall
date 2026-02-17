@@ -7,11 +7,12 @@ rule parsing, weekly reports, and child chatbot.
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user, require_child, require_parent
+from app.core.rate_limit import limiter
 from app.database import get_db
 from app.models.quest import QuestInstance, QuestTemplate
 from app.models.tan import TAN
@@ -45,7 +46,9 @@ AUTO_APPROVE_THRESHOLD = 80
 # ---------------------------------------------------------------------------
 
 @router.post("/verify-proof", response_model=VerifyProofResponse)
+@limiter.limit("10/minute")
 async def verify_proof(
+    request: Request,
     body: VerifyProofRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: User = Depends(get_current_user),
@@ -135,7 +138,9 @@ async def verify_proof(
 # ---------------------------------------------------------------------------
 
 @router.post("/parse-rule", response_model=ParseRuleResponse)
+@limiter.limit("10/minute")
 async def parse_rule(
+    request: Request,
     body: ParseRuleRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: User = Depends(require_parent),
@@ -182,7 +187,9 @@ async def parse_rule(
 # ---------------------------------------------------------------------------
 
 @router.post("/weekly-report", response_model=WeeklyReportResponse)
+@limiter.limit("5/minute")
 async def weekly_report(
+    request: Request,
     body: WeeklyReportRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: User = Depends(require_parent),
@@ -270,7 +277,9 @@ async def weekly_report(
 # ---------------------------------------------------------------------------
 
 @router.post("/chat", response_model=ChatResponse)
+@limiter.limit("20/minute")
 async def chat(
+    request: Request,
     body: ChatRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: User = Depends(get_current_user),

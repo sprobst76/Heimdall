@@ -269,6 +269,13 @@ async def register_with_invitation(
             detail="Einladungscode ungültig oder abgelaufen",
         )
 
+    # Validate invitation role
+    if invitation.role not in ("parent", "child"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ungültige Rolle in der Einladung",
+        )
+
     # Create user in the invitation's family
     user = User(
         family_id=invitation.family_id,
@@ -296,16 +303,18 @@ async def login_pin(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Authenticate a child user with family name + child name + PIN."""
+    _login_failed = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Anmeldung fehlgeschlagen",
+    )
+
     # Find family by name (case-insensitive)
     result = await db.execute(
         select(Family).where(func.lower(Family.name) == body.family_name.strip().lower())
     )
     family = result.scalar_one_or_none()
     if family is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Kind nicht gefunden",
-        )
+        raise _login_failed
 
     # Find child by name in family
     result = await db.execute(
@@ -317,24 +326,15 @@ async def login_pin(
     )
     user = result.scalar_one_or_none()
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Kind nicht gefunden",
-        )
+        raise _login_failed
 
     # Check PIN is set
     if user.pin_hash is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Kein PIN gesetzt — bitte Eltern kontaktieren",
-        )
+        raise _login_failed
 
     # Verify PIN
     if not verify_password(body.pin, user.pin_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Ungültige PIN",
-        )
+        raise _login_failed
 
     return await _create_tokens_for_user(db, user)
 
