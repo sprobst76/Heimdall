@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronRight,
   UserCog,
+  CalendarClock,
 } from 'lucide-react';
 import { useLogout, useFamilyId } from '../hooks/useAuth';
 import { useChildren } from '../hooks/useChildren';
@@ -169,6 +170,14 @@ export default function Layout() {
                       >
                         <Ticket className="h-3.5 w-3.5" />
                         TANs
+                      </NavLink>
+                      <NavLink
+                        to={`/tan-schedules/${child.id}`}
+                        className={childNavClasses}
+                        onClick={() => setSidebarOpen(false)}
+                      >
+                        <CalendarClock className="h-3.5 w-3.5" />
+                        TAN-Regeln
                       </NavLink>
                       <NavLink
                         to={`/app-groups/${child.id}`}

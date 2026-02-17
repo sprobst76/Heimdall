@@ -421,6 +421,50 @@ export interface UsageRewardLog {
   created_at: string;
 }
 
+// ── TAN Schedule ────────────────────────────────────────────────────────────
+
+export interface TanSchedule {
+  id: string;
+  child_id: string;
+  name: string;
+  recurrence: string;
+  tan_type: string;
+  value_minutes?: number | null;
+  value_unlock_until?: string | null;
+  scope_groups?: string[] | null;
+  scope_devices?: string[] | null;
+  expires_after_hours: number;
+  active: boolean;
+  created_at: string;
+}
+
+export interface TanScheduleCreate {
+  name: string;
+  recurrence: string;
+  tan_type: string;
+  value_minutes?: number | null;
+  scope_groups?: string[] | null;
+  expires_after_hours?: number;
+}
+
+export interface TanScheduleUpdate {
+  name?: string;
+  recurrence?: string;
+  tan_type?: string;
+  value_minutes?: number | null;
+  scope_groups?: string[] | null;
+  expires_after_hours?: number;
+  active?: boolean;
+}
+
+export interface TanScheduleLog {
+  id: string;
+  schedule_id: string;
+  generated_date: string;
+  generated_tan_id: string;
+  created_at: string;
+}
+
 // ── Invitation ──────────────────────────────────────────────────────────────
 
 export interface FamilyInvitation {

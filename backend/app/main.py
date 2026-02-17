@@ -14,7 +14,7 @@ from slowapi.util import get_remote_address
 from sqlalchemy import select
 
 from app.config import settings
-from app.routers import agent, analytics, app_groups, auth, children, day_types, devices, families, llm, portal_ws, quests, tans, time_rules, uploads, usage_rewards
+from app.routers import agent, analytics, app_groups, auth, children, day_types, devices, families, llm, portal_ws, quests, tan_schedules, tans, time_rules, uploads, usage_rewards
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +75,31 @@ async def _usage_reward_loop() -> None:
 
 
 # ---------------------------------------------------------------------------
+# TAN Schedule background task
+# ---------------------------------------------------------------------------
+async def _tan_schedule_loop() -> None:
+    """Generate scheduled TANs daily at 00:15 UTC."""
+    from app.database import async_session
+    from app.services.tan_scheduler import run_tan_schedules
+
+    while True:
+        try:
+            async with async_session() as db:
+                count = await run_tan_schedules(db)
+                await db.commit()
+                logger.info("TAN scheduler: %d TANs generated", count)
+        except Exception:
+            logger.exception("TAN scheduler error")
+
+        # Sleep until tomorrow 00:15 UTC
+        now = datetime.now(timezone.utc)
+        tomorrow = (now + timedelta(days=1)).replace(
+            hour=0, minute=15, second=0, microsecond=0,
+        )
+        await asyncio.sleep((tomorrow - now).total_seconds())
+
+
+# ---------------------------------------------------------------------------
 # Holiday Sync background task
 # ---------------------------------------------------------------------------
 async def _holiday_sync_loop() -> None:
@@ -114,9 +139,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     logger.info("Heimdall API started")
     scheduler_task = asyncio.create_task(_quest_scheduler_loop())
     reward_task = asyncio.create_task(_usage_reward_loop())
+    tan_schedule_task = asyncio.create_task(_tan_schedule_loop())
     holiday_task = asyncio.create_task(_holiday_sync_loop())
     yield
     holiday_task.cancel()
+    tan_schedule_task.cancel()
     reward_task.cancel()
     scheduler_task.cancel()
     logger.info("Heimdall API shutting down")
@@ -180,4 +207,5 @@ app.include_router(llm.router, prefix=settings.API_V1_PREFIX)
 app.include_router(analytics.router, prefix=settings.API_V1_PREFIX)
 app.include_router(agent.router, prefix=settings.API_V1_PREFIX)
 app.include_router(usage_rewards.router, prefix=settings.API_V1_PREFIX)
+app.include_router(tan_schedules.router, prefix=settings.API_V1_PREFIX)
 app.include_router(portal_ws.router, prefix=settings.API_V1_PREFIX)
