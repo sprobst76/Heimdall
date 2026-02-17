@@ -7,21 +7,16 @@ from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 from sqlalchemy import select
 
 from app.config import settings
+from app.core.rate_limit import limiter
 from app.routers import agent, analytics, app_groups, auth, children, day_types, devices, families, llm, portal_ws, quests, tan_schedules, tans, time_rules, uploads, usage_rewards
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Rate limiter
-# ---------------------------------------------------------------------------
-limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
 
 # ---------------------------------------------------------------------------
@@ -156,10 +151,28 @@ app = FastAPI(
     title=settings.APP_NAME,
     version="0.1.0",
     lifespan=lifespan,
+    docs_url="/docs" if settings.DEBUG else None,
+    redoc_url="/redoc" if settings.DEBUG else None,
+    openapi_url="/openapi.json" if settings.DEBUG else None,
 )
 
 
+MAX_BODY_SIZE = 12 * 1024 * 1024  # 12 MB (slightly above 10 MB upload limit)
+
+
 # -- Middleware ---------------------------------------------------------------
+@app.middleware("http")
+async def limit_request_body(request: Request, call_next):
+    """Reject requests with Content-Length exceeding the limit."""
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_BODY_SIZE:
+        return JSONResponse(
+            status_code=413,
+            content={"detail": "Request body too large"},
+        )
+    return await call_next(request)
+
+
 @app.middleware("http")
 async def fix_redirect_scheme(request: Request, call_next):
     """Ensure redirects use https when behind a TLS-terminating reverse proxy."""

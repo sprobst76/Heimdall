@@ -41,6 +41,7 @@ services:
     image: redis:7-alpine
     container_name: heimdall-redis
     restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:?ENV_VAR_REQUIRED}
     deploy:
       resources:
         limits:
@@ -53,7 +54,7 @@ services:
         max-size: "5m"
         max-file: "3"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -74,7 +75,7 @@ services:
     environment:
       - TZ=${TZ:-Europe/Berlin}
       - DATABASE_URL=postgresql+asyncpg://heimdall:${POSTGRES_PASSWORD}@heimdall-postgres:5432/heimdall
-      - REDIS_URL=redis://heimdall-redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@heimdall-redis:6379/0
       - SECRET_KEY=${SECRET_KEY:?ENV_VAR_REQUIRED}
       - CORS_ORIGINS=${CORS_ORIGINS:-["https://heimdall.lab.${DOMAIN}"]}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
@@ -100,7 +101,7 @@ services:
       start_period: 15s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.heimdall-api.rule=Host(`heimdall.lab.${DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/health`) || PathPrefix(`/docs`) || PathPrefix(`/openapi.json`))"
+      - "traefik.http.routers.heimdall-api.rule=Host(`heimdall.lab.${DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/health`))"
       - "traefik.http.routers.heimdall-api.entrypoints=websecure"
       - "traefik.http.routers.heimdall-api.tls.certresolver=cloudflare"
       - "traefik.http.routers.heimdall-api.middlewares=security-headers@file,rate-limit-standard@file"

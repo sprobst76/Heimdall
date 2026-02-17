@@ -81,6 +81,7 @@ DerivedData/
 *.key
 credentials.json
 secrets.yaml
+SECRETS.local
 
 # ===== OS =====
 .DS_Store

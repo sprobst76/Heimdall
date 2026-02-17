@@ -17,6 +17,13 @@ router = APIRouter(prefix="/uploads", tags=["Uploads"])
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
+# Magic bytes for allowed image formats
+MAGIC_BYTES = {
+    b"\xff\xd8\xff": "image/jpeg",
+    b"\x89PNG": "image/png",
+    b"RIFF": "image/webp",  # WebP starts with RIFF....WEBP
+}
+
 
 def _get_upload_dir() -> Path:
     """Get or create the upload directory."""
@@ -43,6 +50,22 @@ async def upload_proof(
 
     # Read and validate size
     content = await file.read()
+
+    # Validate magic bytes
+    detected = False
+    for magic, mime in MAGIC_BYTES.items():
+        if content[:len(magic)] == magic:
+            detected = True
+            # Extra check for WebP: bytes 8-12 must be "WEBP"
+            if mime == "image/webp" and content[8:12] != b"WEBP":
+                detected = False
+            break
+    if not detected:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File content does not match an allowed image format",
+        )
+
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

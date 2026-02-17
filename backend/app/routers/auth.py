@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from jose import JWTError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +21,7 @@ from app.core.security import (
     get_password_hash,
     verify_password,
 )
+from app.core.rate_limit import limiter
 from app.database import get_db
 from app.models.family import Family
 from app.models.invitation import FamilyInvitation
@@ -81,7 +82,9 @@ async def _create_tokens_for_user(
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     body: LoginRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
@@ -105,7 +108,9 @@ async def login(
 
 
 @router.post("/register", response_model=TokenResponse)
+@limiter.limit("3/minute")
 async def register(
+    request: Request,
     body: RegisterRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
@@ -226,7 +231,9 @@ async def logout(
 
 
 @router.post("/register-with-invitation", response_model=TokenResponse)
+@limiter.limit("3/minute")
 async def register_with_invitation(
+    request: Request,
     body: RegisterWithInvitationRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
@@ -282,7 +289,9 @@ async def register_with_invitation(
 
 
 @router.post("/login-pin", response_model=TokenResponse)
+@limiter.limit("5/minute")
 async def login_pin(
+    request: Request,
     body: PinLoginRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):

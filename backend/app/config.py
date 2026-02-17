@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     # App
     APP_NAME: str = "Heimdall API"
     API_V1_PREFIX: str = "/api/v1"
+    DEBUG: bool = False
 
     # LLM / Anthropic
     ANTHROPIC_API_KEY: str = ""
