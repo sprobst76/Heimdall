@@ -16,8 +16,12 @@ RUN uv sync --frozen --no-dev
 # Copy application code
 COPY . .
 
-# Create uploads directory
-RUN mkdir -p uploads
+# Create uploads directory and non-root user
+RUN useradd -m -u 1000 appuser \
+    && mkdir -p uploads \
+    && chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8000
 
