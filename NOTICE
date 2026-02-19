@@ -1,0 +1,18 @@
+Heimdall — Parental Control System (Kindersicherung)
+Copyright 2025-2026 Sebastian Probst
+
+This software is licensed under the Elastic License 2.0 (ELv2).
+See the LICENSE file for the full license text.
+
+--- What this means in practice ---
+
+ALLOWED (free):
+  - Self-hosting for your own family on your own server
+  - Modifying the source code for personal use
+  - Sharing the code (with this license intact)
+
+NOT ALLOWED (requires commercial license):
+  - Offering Heimdall as a hosted/managed service for others
+  - Running a multi-tenant SaaS platform based on Heimdall
+
+For commercial licensing inquiries, contact: sebastian@2skills.com
