@@ -20,6 +20,7 @@ import {
   ChevronRight,
   UserCog,
   CalendarClock,
+  ShieldCheck,
 } from 'lucide-react';
 import { useLogout, useFamilyId } from '../hooks/useAuth';
 import { useChildren } from '../hooks/useChildren';
@@ -178,6 +179,14 @@ export default function Layout() {
                       >
                         <CalendarClock className="h-3.5 w-3.5" />
                         TAN-Regeln
+                      </NavLink>
+                      <NavLink
+                        to={`/totp/${child.id}`}
+                        className={childNavClasses}
+                        onClick={() => setSidebarOpen(false)}
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        TOTP
                       </NavLink>
                       <NavLink
                         to={`/app-groups/${child.id}`}

@@ -561,3 +561,23 @@ export interface AnalyticsResponse {
   trends: WeeklyTrend[];
   group_breakdown: GroupUsage[];
 }
+
+// ── TOTP ─────────────────────────────────────────────────────────────────────
+
+export interface TotpStatus {
+  enabled: boolean;
+  mode: 'tan' | 'override' | 'both';
+  tan_minutes: number;
+  override_minutes: number;
+}
+
+export interface TotpSetup {
+  secret: string;
+  provisioning_uri: string;
+}
+
+export interface TotpSettingsUpdate {
+  mode?: 'tan' | 'override' | 'both';
+  tan_minutes?: number;
+  override_minutes?: number;
+}

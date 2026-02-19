@@ -17,6 +17,7 @@ import FamilySettingsPage from './pages/FamilySettingsPage';
 import HolidaysPage from './pages/HolidaysPage';
 import ProfilePage from './pages/ProfilePage';
 import TanSchedulesPage from './pages/TanSchedulesPage';
+import TotpPage from './pages/TotpPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,6 +52,7 @@ export default function App() {
             <Route path="devices/:childId" element={<DevicesPage />} />
             <Route path="usage-rewards/:childId" element={<UsageRewardsPage />} />
             <Route path="tan-schedules/:childId" element={<TanSchedulesPage />} />
+            <Route path="totp/:childId" element={<TotpPage />} />
             <Route path="holidays" element={<HolidaysPage />} />
             <Route path="family" element={<FamilySettingsPage />} />
             <Route path="profile" element={<ProfilePage />} />

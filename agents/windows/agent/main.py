@@ -25,7 +25,7 @@ import logging
 import signal
 import sys
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .blocker import AppBlocker
@@ -79,10 +79,13 @@ class HeimdallAgent:
         self._rules: dict[str, Any] = {}
         self._stop_event = asyncio.Event()
         self._online = False
+        self._totp_config: dict[str, Any] | None = None
+        self._totp_override_until: datetime | None = None  # local TOTP override expiry
 
         # Wire callbacks
         self._blocker.on_block_action = self._on_block_action
         self._overlay.on_tan_entered = self._on_tan_entered
+        self._overlay.on_totp_entered = self._on_totp_entered
         self._tray.on_tan_entry = lambda: self._overlay._show_tan_dialog()
         self._tray.on_quit = self._request_stop
 
@@ -272,6 +275,8 @@ class HeimdallAgent:
     def _apply_rules(self, rules: dict[str, Any]) -> None:
         """Apply a resolved-rules dict: update blocked groups and tray."""
         self._rules = rules
+        # Cache TOTP config for offline validation
+        self._totp_config = rules.get("totp_config")
         daily_limit = rules.get("daily_limit_minutes")
         group_limits = rules.get("group_limits", [])
 
@@ -312,7 +317,11 @@ class HeimdallAgent:
     async def _enforce_loop(self) -> None:
         """Periodically enforce blocking on the current session."""
         while not self._stop_event.is_set():
-            await self._blocker.enforce(self._monitor.current_session)
+            # Skip enforcement while a TOTP override is active
+            now = datetime.now(timezone.utc)
+            if self._totp_override_until is None or now >= self._totp_override_until:
+                self._totp_override_until = None  # expired — clear it
+                await self._blocker.enforce(self._monitor.current_session)
             try:
                 await asyncio.wait_for(self._stop_event.wait(), timeout=self._config.monitor_interval)
                 break
@@ -413,6 +422,61 @@ class HeimdallAgent:
                 break
 
         self._overlay.show(executable, group_name, used, limit)
+
+    # ------------------------------------------------------------------
+    # TOTP callbacks (from overlay)
+    # ------------------------------------------------------------------
+
+    def _verify_totp_code_offline(self, code: str) -> bool:
+        """Verify a 6-digit TOTP code against the cached secret."""
+        if self._totp_config is None:
+            log.debug("TOTP: no config cached, cannot verify offline.")
+            return False
+        secret = self._totp_config.get("secret")
+        if not secret:
+            return False
+        try:
+            import pyotp
+            return pyotp.TOTP(secret).verify(code, valid_window=1)
+        except Exception:
+            log.exception("TOTP offline verification error")
+            return False
+
+    def _on_totp_entered(self, code: str) -> None:
+        """Called when the user enters a TOTP code in the overlay dialog."""
+        if not self._verify_totp_code_offline(code):
+            log.warning("TOTP: invalid code entered.")
+            # Show error in overlay (non-blocking message box)
+            try:
+                import tkinter as tk
+                from tkinter import messagebox
+                root = tk.Tk()
+                root.withdraw()
+                messagebox.showerror("Ungültiger Code", "Der eingegebene Code ist ungültig.")
+                root.destroy()
+            except Exception:
+                pass
+            return
+
+        totp_cfg = self._totp_config or {}
+        mode = totp_cfg.get("mode", "tan")
+        minutes = (
+            totp_cfg.get("override_minutes", 30)
+            if mode == "override"
+            else totp_cfg.get("tan_minutes", 30)
+        )
+
+        log.info("TOTP: valid code — granting %d min (%s mode).", minutes, mode)
+
+        # Apply local override: suspend enforcement for 'minutes' minutes
+        self._totp_override_until = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+
+        # Unblock all currently blocked groups so the overlay can be dismissed
+        for group_id in list(self._blocker.blocked_groups):
+            self._blocker.unblock_group(group_id)
+        self._overlay.dismiss()
+
+        log.info("TOTP override active until %s.", self._totp_override_until.isoformat())
 
     # ------------------------------------------------------------------
     # TAN entry callback (from overlay)

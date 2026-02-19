@@ -35,7 +35,7 @@ class TAN(Base):
     single_use: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     source: Mapped[str] = mapped_column(
         String(20), nullable=False
-    )  # 'quest', 'parent_manual', 'scheduled'
+    )  # 'quest', 'parent_manual', 'scheduled', 'totp'
     source_quest_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, nullable=True
     )

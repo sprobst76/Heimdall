@@ -23,6 +23,12 @@ class User(Base):
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     age: Mapped[int | None] = mapped_column(Integer, nullable=True)
     pin_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # TOTP parent authorization
+    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    totp_mode: Mapped[str] = mapped_column(String(20), default="tan", nullable=False)
+    totp_tan_minutes: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
+    totp_override_minutes: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

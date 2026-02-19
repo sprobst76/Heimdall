@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/tan.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import 'totp_unlock_screen.dart';
 
 class TanScreen extends StatefulWidget {
   const TanScreen({super.key});
@@ -207,6 +208,24 @@ class _TanScreenState extends State<TanScreen> {
                   ),
                 ],
               ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // TOTP unlock button
+          OutlinedButton.icon(
+            onPressed: () async {
+              final result = await Navigator.of(context).push<bool>(
+                MaterialPageRoute(
+                  builder: (_) => const TotpUnlockScreen(),
+                ),
+              );
+              if (result == true) await _loadTans();
+            },
+            icon: const Icon(Icons.shield_outlined),
+            label: const Text('Eltern-Code eingeben'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
             ),
           ),
           const SizedBox(height: 24),

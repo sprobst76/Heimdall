@@ -14,7 +14,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.core.rate_limit import limiter
-from app.routers import agent, analytics, app_groups, auth, children, day_types, devices, families, llm, portal_ws, quests, tan_schedules, tans, time_rules, uploads, usage_rewards
+from app.routers import agent, analytics, app_groups, auth, children, day_types, devices, families, llm, portal_ws, quests, tan_schedules, tans, time_rules, totp, uploads, usage_rewards
 
 logger = logging.getLogger(__name__)
 
@@ -221,4 +221,5 @@ app.include_router(analytics.router, prefix=settings.API_V1_PREFIX)
 app.include_router(agent.router, prefix=settings.API_V1_PREFIX)
 app.include_router(usage_rewards.router, prefix=settings.API_V1_PREFIX)
 app.include_router(tan_schedules.router, prefix=settings.API_V1_PREFIX)
+app.include_router(totp.router, prefix=settings.API_V1_PREFIX)
 app.include_router(portal_ws.router, prefix=settings.API_V1_PREFIX)

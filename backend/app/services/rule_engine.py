@@ -225,6 +225,16 @@ async def get_current_rules(
     ]
 
     # 8. Return resolved rules
+    totp_config = None
+    if child.totp_enabled and child.totp_secret:
+        totp_config = {
+            "enabled": True,
+            "secret": child.totp_secret,
+            "mode": child.totp_mode,
+            "tan_minutes": child.totp_tan_minutes,
+            "override_minutes": child.totp_override_minutes,
+        }
+
     return {
         "day_type": day_type,
         "time_windows": time_windows,
@@ -234,4 +244,5 @@ async def get_current_rules(
         "active_tans": tan_list,
         "coupled_devices": coupled_devices,
         "shared_budget": shared_budget,
+        "totp_config": totp_config,
     }

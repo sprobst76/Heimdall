@@ -63,6 +63,7 @@ class BlockingOverlay:
         self._root: tk.Tk | None = None
         self._thread: threading.Thread | None = None
         self.on_tan_entered: Callable[[str], None] | None = None
+        self.on_totp_entered: Callable[[str], None] | None = None
 
     # -- public API -----------------------------------------------------------
 
@@ -203,6 +204,20 @@ class BlockingOverlay:
 
         tk.Button(
             btn_frame,
+            text="Eltern-Code",
+            font=("Segoe UI", 13),
+            fg=_BTN_FG,
+            bg=_BTN_BG,
+            activebackground=_ACCENT,
+            activeforeground="#ffffff",
+            relief=tk.FLAT,
+            padx=20,
+            pady=10,
+            command=lambda: self._show_totp_dialog(root),
+        ).pack(side=tk.LEFT, padx=10)
+
+        tk.Button(
+            btn_frame,
             text="Quests anzeigen",
             font=("Segoe UI", 13),
             fg=_BTN_FG,
@@ -248,6 +263,28 @@ class BlockingOverlay:
             webbrowser.open(url)
         except Exception:
             log.exception("Failed to open browser for %s", url)
+
+    def _show_totp_dialog(self, parent: tk.Tk | None = None) -> None:
+        """Show a numeric input dialog for TOTP (6-digit parent code) entry."""
+        if not _HAS_TK:
+            return
+
+        code = simpledialog.askstring(
+            "Eltern-Code eingeben",
+            "Bitte gib den 6-stelligen Eltern-Code ein:",
+            parent=parent,
+        )
+
+        if code and code.strip():
+            code = code.strip()
+            log.info("TOTP code entered (length=%d).", len(code))
+            if self.on_totp_entered is not None:
+                try:
+                    self.on_totp_entered(code)
+                except Exception:
+                    log.exception("on_totp_entered callback failed")
+        else:
+            log.debug("TOTP dialog cancelled or empty input.")
 
     def _show_tan_dialog(self, parent: tk.Tk | None = None) -> None:
         """Show a simple input dialog for TAN entry.

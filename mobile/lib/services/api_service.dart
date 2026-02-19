@@ -149,6 +149,16 @@ class ApiService {
     return response.data;
   }
 
+  // TOTP
+  Future<Map<String, dynamic>> unlockTotp(
+      String childId, String code, String mode) async {
+    final response = await _dio.post('/children/$childId/totp/unlock', data: {
+      'code': code,
+      'mode': mode,
+    });
+    return response.data;
+  }
+
   // Chat (LLM)
   Future<String> chat(String message, List<Map<String, String>> history) async {
     final response = await _dio.post('/llm/chat', data: {
