@@ -56,12 +56,25 @@ class AgentCommunication(private val context: Context) {
 
     // -- REST endpoints --
 
-    suspend fun sendHeartbeat(activeApp: String? = null): JSONObject? = withContext(Dispatchers.IO) {
+    suspend fun sendHeartbeat(activeApp: String? = null, safeMode: Boolean = false): JSONObject? = withContext(Dispatchers.IO) {
         val body = JSONObject().apply {
             put("timestamp", Instant.now().toString())
             put("active_app", activeApp)
+            if (safeMode) put("safe_mode", true)
         }
         postJson("/agent/heartbeat", body)
+    }
+
+    /**
+     * Report a tamper attempt to the backend so parents can be notified.
+     * Called when the monitoring service detects it was previously force-killed.
+     */
+    suspend fun sendTamperAlert(reason: String): JSONObject? = withContext(Dispatchers.IO) {
+        val body = JSONObject().apply {
+            put("timestamp", Instant.now().toString())
+            put("reason", reason)
+        }
+        postJson("/agent/tamper-alert", body)
     }
 
     suspend fun sendUsageEvent(

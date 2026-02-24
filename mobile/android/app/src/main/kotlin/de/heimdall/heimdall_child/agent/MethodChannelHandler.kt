@@ -35,6 +35,7 @@ class MethodChannelHandler(
         AppMonitorService.instance?.ruleEvaluator = ruleEvaluator
         wireWebSocketCallbacks()
         wireSyncCallback()
+        wireMonitorCallbacks()
         Log.i(TAG, "Method channel handler initialized")
     }
 
@@ -105,17 +106,57 @@ class MethodChannelHandler(
 
     /**
      * Wire AppMonitorService.onSyncNeeded → sends heartbeat + flushes queued events.
+     * Also includes safe mode detection in the heartbeat payload.
      * Called every ~60s from the monitoring loop.
      */
     private fun wireSyncCallback() {
         AppMonitorService.instance?.onSyncNeeded = { activePackage ->
             scope.launch(Dispatchers.IO) {
                 try {
-                    communication?.sendHeartbeat(activePackage)
+                    val safe = isSafeMode()
+                    communication?.sendHeartbeat(activePackage, safe)
+                    if (safe) {
+                        scope.launch(Dispatchers.Main) {
+                            channel.invokeMethod("onSafeModeDetected", null)
+                        }
+                        Log.w(TAG, "Safe mode detected — reported to backend and Flutter")
+                    }
                     flushPendingEvents()
                 } catch (e: Exception) {
                     Log.w(TAG, "Sync failed: ${e.message}")
                 }
+            }
+        }
+    }
+
+    /**
+     * Wire AppMonitorService tamper and limit-warning callbacks.
+     * Should be called after service start (with delay) and on initialize().
+     */
+    private fun wireMonitorCallbacks() {
+        val monitor = AppMonitorService.instance ?: return
+
+        monitor.onTamperDetected = { reason ->
+            scope.launch(Dispatchers.IO) {
+                try {
+                    communication?.sendTamperAlert(reason)
+                    Log.w(TAG, "Tamper alert sent: $reason")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Tamper alert failed: ${e.message}")
+                }
+            }
+            scope.launch(Dispatchers.Main) {
+                channel.invokeMethod("onTamperDetected", mapOf("reason" to reason))
+            }
+        }
+
+        monitor.onLimitWarning = { groupId, remainingMinutes ->
+            scope.launch(Dispatchers.Main) {
+                channel.invokeMethod("onLimitWarning", mapOf(
+                    "groupId" to groupId,
+                    "remainingMinutes" to remainingMinutes
+                ))
+                Log.i(TAG, "Limit warning sent to Flutter: group=$groupId remaining=${remainingMinutes}min")
             }
         }
     }
@@ -157,6 +198,7 @@ class MethodChannelHandler(
                     kotlinx.coroutines.delay(500)
                     AppMonitorService.instance?.ruleEvaluator = ruleEvaluator
                     wireSyncCallback()
+                    wireMonitorCallbacks()
                 }
                 // Connect WebSocket for real-time rule updates
                 if (communication?.isRegistered == true) {

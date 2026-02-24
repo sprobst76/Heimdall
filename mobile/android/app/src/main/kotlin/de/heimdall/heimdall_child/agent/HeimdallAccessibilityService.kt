@@ -53,4 +53,14 @@ class HeimdallAccessibilityService : AccessibilityService() {
     }
 
     fun isActive(): Boolean = instance != null
+
+    /**
+     * Navigate away from the currently blocked app by pressing the Home button.
+     * Called by AppMonitorService immediately before showing the blocking overlay,
+     * so the blocked app is pushed to the background rather than staying visible
+     * behind the overlay.
+     */
+    fun pressHome() {
+        performGlobalAction(GLOBAL_ACTION_HOME)
+    }
 }

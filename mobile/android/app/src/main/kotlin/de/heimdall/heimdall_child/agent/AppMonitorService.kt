@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import de.heimdall.heimdall_child.R
 import kotlinx.coroutines.*
+import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 
 // Re-evaluation interval for time-window transitions (e.g. 14:00 → allowed)
@@ -39,6 +40,14 @@ class AppMonitorService : Service() {
     // Rule evaluator for time-window and daily-limit enforcement
     var ruleEvaluator: RuleEvaluator? = null
 
+    // Tracks which groups have already received a 5-min limit warning today
+    private val warnedLimitGroups = mutableSetOf<String>()
+
+    // SharedPrefs for tamper detection and daily reset state
+    private val statePrefs by lazy {
+        getSharedPreferences("heimdall_state", Context.MODE_PRIVATE)
+    }
+
     // Callbacks
     var onAppChanged: ((oldPkg: String, newPkg: String) -> Unit)? = null
     var appGroupMap: Map<String, String> = emptyMap()  // packageName -> groupId
@@ -46,18 +55,41 @@ class AppMonitorService : Service() {
     var onBlockTriggered: ((packageName: String, groupId: String) -> Unit)? = null
     /** Called every ~60s by the monitoring loop. Used by MethodChannelHandler to send heartbeats. */
     var onSyncNeeded: (suspend (activePackage: String?) -> Unit)? = null
+    /** Fired when the service detects it was previously force-killed (tamper attempt). */
+    var onTamperDetected: ((reason: String) -> Unit)? = null
+    /** Fired when a group is approaching its daily limit (≤5 min remaining). */
+    var onLimitWarning: ((groupId: String, remainingMinutes: Int) -> Unit)? = null
 
     override fun onCreate() {
         super.onCreate()
         instance = this
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification())
+        checkTamper()
         // Register for instant A11y notifications (much faster than polling)
         HeimdallAccessibilityService.onAppChanged = { pkg ->
             handleForegroundChange(pkg)
         }
         startMonitoring()
         Log.i(TAG, "Monitor service created")
+    }
+
+    /**
+     * Tamper detection: if the previous session ended without calling onDestroy()
+     * (i.e. the service was force-killed), fire the tamper callback.
+     * We set graceful_shutdown=false on create and true on destroy.
+     */
+    private fun checkTamper() {
+        val wasGraceful = statePrefs.getBoolean("graceful_shutdown", true)
+        statePrefs.edit().putBoolean("graceful_shutdown", false).apply()
+        if (!wasGraceful) {
+            Log.w(TAG, "Tamper detected: service was force-killed previously")
+            // Delay to allow MethodChannelHandler to wire the callback first
+            scope.launch {
+                delay(3000)
+                onTamperDetected?.invoke("service_killed")
+            }
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -71,6 +103,8 @@ class AppMonitorService : Service() {
         scope.cancel()
         HeimdallAccessibilityService.onAppChanged = null
         instance = null
+        // Mark as graceful shutdown so next start doesn't trigger tamper alert
+        statePrefs.edit().putBoolean("graceful_shutdown", true).apply()
         super.onDestroy()
         Log.i(TAG, "Monitor service destroyed")
     }
@@ -160,7 +194,9 @@ class AppMonitorService : Service() {
                 val now = System.currentTimeMillis()
                 if (now - lastRuleEvalAt >= RULE_EVAL_INTERVAL_MS) {
                     lastRuleEvalAt = now
+                    checkDailyReset()
                     reevaluateCurrentApp()
+                    checkApproachingLimits()
                     // Notify MethodChannelHandler to send heartbeat + flush events
                     val activePkg = currentForegroundPackage.ifEmpty { null }
                     onSyncNeeded?.invoke(activePkg)
@@ -231,9 +267,46 @@ class AppMonitorService : Service() {
 
     fun resetDailyUsage() {
         usageByGroup.clear()
+        warnedLimitGroups.clear()
+        Log.i(TAG, "Daily usage counters reset")
+    }
+
+    /**
+     * Check if the calendar date has changed since last reset and reset usage if so.
+     * Called every 60s from the polling loop — catches the midnight transition.
+     */
+    private fun checkDailyReset() {
+        val today = LocalDate.now().toString()
+        val lastResetDate = statePrefs.getString("last_reset_date", "") ?: ""
+        if (today != lastResetDate) {
+            resetDailyUsage()
+            statePrefs.edit().putString("last_reset_date", today).apply()
+            Log.i(TAG, "Daily reset triggered for $today")
+        }
+    }
+
+    /**
+     * Check all known app groups for approaching daily limits.
+     * Fires onLimitWarning when a group has ≤5 minutes remaining (once per day per group).
+     */
+    private fun checkApproachingLimits() {
+        val evaluator = ruleEvaluator ?: return
+        val groups = appGroupMap.values.toSet()
+        for (groupId in groups) {
+            if (groupId in warnedLimitGroups) continue
+            val remaining = evaluator.getRemainingMinutesForGroup(groupId, usageByGroup) ?: continue
+            if (remaining in 1..5) {
+                warnedLimitGroups.add(groupId)
+                Log.i(TAG, "Approaching limit: group=$groupId remaining=${remaining}min")
+                onLimitWarning?.invoke(groupId, remaining)
+            }
+        }
     }
 
     private fun showBlockingOverlay(packageName: String, groupId: String) {
+        // Navigate away from the blocked app before showing overlay
+        // so the app is pushed to background, not just hidden behind overlay
+        HeimdallAccessibilityService.instance?.pressHome()
         val intent = Intent(this, BlockingOverlayService::class.java).apply {
             putExtra("packageName", packageName)
             putExtra("groupId", groupId)
