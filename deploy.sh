@@ -97,7 +97,7 @@ update() {
     cd "$BACKEND_DIR"
     log_info "Rebuilding containers..."
     docker compose build --no-cache api web
-    docker compose up -d api web
+    docker compose up -d --remove-orphans
 
     # Run migrations
     log_info "Running database migrations..."
