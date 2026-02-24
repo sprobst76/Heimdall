@@ -1,0 +1,47 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python*)", "Bash(python3*)", "Bash(pip*)", "Bash(uv*)",
+      "Bash(pytest*)", "Bash(.venv/bin/python*)", "Bash(.venv/bin/pytest*)",
+      "Bash(alembic*)", "Bash(uvicorn*)",
+      "Bash(node*)", "Bash(npm*)", "Bash(npx*)",
+      "Bash(flutter*)", "Bash(/home/spro/flutter/bin/flutter*)",
+      "Bash(dart*)", "Bash(pub*)",
+      "Bash(JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew*)",
+      "Bash(JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./android/gradlew*)",
+      "Bash(JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 /home/spro/flutter/bin/flutter*)",
+      "Bash(adb*)",
+      "Bash(git*)", "Bash(gh*)",
+      "Bash(ls*)", "Bash(cat*)", "Bash(grep*)", "Bash(find*)",
+      "Bash(head*)", "Bash(tail*)", "Bash(wc*)", "Bash(tr*)",
+      "Bash(mkdir*)", "Bash(cp*)", "Bash(mv*)", "Bash(touch*)",
+      "Bash(chmod*)", "Bash(source*)",
+      "Bash(echo*)", "Bash(sed*)", "Bash(sort*)", "Bash(xargs*)",
+      "Bash(curl*)", "Bash(sleep*)", "Bash(until*)",
+      "Bash(redis-cli*)", "Bash(pg_isready*)",
+      "Bash(black*)", "Bash(ruff*)",
+      "Bash(rm /home/spro/development/Heimdall*)",
+      "Bash(rm -f /home/spro/development/Heimdall*)",
+      "Bash(rm -rf /home/spro/development/Heimdall*)",
+      "Bash(rm /tmp/Heimdall*)",
+      "Bash(rm -f /tmp/Heimdall*)",
+      "Bash(rm -rf /tmp/Heimdall*)",
+      "Bash(ssh aiplatform@halbewahrheit21.de \"cd /srv/heimdall && ./deploy.sh status*\")",
+      "Bash(ssh aiplatform@halbewahrheit21.de \"cd /srv/heimdall && ./deploy.sh logs*\")",
+      "WebSearch",
+      "WebFetch(domain:pub.dev)",
+      "WebFetch(domain:openholidaysapi.org)"
+    ],
+    "deny": [
+      "Bash(sudo*)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf /home*)",
+      "Bash(rm -rf /root*)",
+      "Bash(rm -rf /srv*)",
+      "Bash(shutdown*)",
+      "Bash(reboot*)",
+      "Bash(systemctl*)",
+      "Bash(ssh*)"
+    ]
+  }
+}
