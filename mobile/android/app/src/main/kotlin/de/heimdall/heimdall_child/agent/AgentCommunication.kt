@@ -38,6 +38,7 @@ class AgentCommunication(private val context: Context) {
     var onRuleUpdate: ((JSONObject) -> Unit)? = null
     var onBlockApp: ((String) -> Unit)? = null
     var onUnblockApp: ((String) -> Unit)? = null
+    var onConnected: (() -> Unit)? = null
 
     val serverUrl: String get() = prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER) ?: DEFAULT_SERVER
     val deviceToken: String get() = prefs.getString(KEY_DEVICE_TOKEN, "") ?: ""
@@ -96,9 +97,10 @@ class AgentCommunication(private val context: Context) {
         val request = Request.Builder().url(url).build()
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
-                // Send device token as first message
+                // Send device token as first message for authentication
                 ws.send(deviceToken)
                 Log.i(TAG, "WebSocket opened, sent auth token")
+                onConnected?.invoke()
             }
 
             override fun onMessage(ws: WebSocket, text: String) {

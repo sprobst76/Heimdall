@@ -27,6 +27,7 @@ class BlockingOverlayService : Service() {
 
     private var windowManager: WindowManager? = null
     private var overlayView: View? = null
+    val isShowing: Boolean get() = overlayView != null
 
     override fun onCreate() {
         super.onCreate()

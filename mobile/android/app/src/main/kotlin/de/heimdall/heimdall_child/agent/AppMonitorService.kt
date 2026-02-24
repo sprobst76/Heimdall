@@ -12,6 +12,9 @@ import de.heimdall.heimdall_child.R
 import kotlinx.coroutines.*
 import java.util.concurrent.TimeUnit
 
+// Re-evaluation interval for time-window transitions (e.g. 14:00 → allowed)
+private const val RULE_EVAL_INTERVAL_MS = 60_000L
+
 class AppMonitorService : Service() {
     companion object {
         private const val TAG = "HeimdallMonitor"
@@ -33,11 +36,16 @@ class AppMonitorService : Service() {
     private var sessionStart: Long = 0L
     private var sessionPackage: String = ""
 
+    // Rule evaluator for time-window and daily-limit enforcement
+    var ruleEvaluator: RuleEvaluator? = null
+
     // Callbacks
     var onAppChanged: ((oldPkg: String, newPkg: String) -> Unit)? = null
     var appGroupMap: Map<String, String> = emptyMap()  // packageName -> groupId
-    var blockedGroups: MutableSet<String> = mutableSetOf()
+    var blockedGroups: MutableSet<String> = mutableSetOf()  // manually blocked groups
     var onBlockTriggered: ((packageName: String, groupId: String) -> Unit)? = null
+    /** Called every ~60s by the monitoring loop. Used by MethodChannelHandler to send heartbeats. */
+    var onSyncNeeded: (suspend (activePackage: String?) -> Unit)? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -117,12 +125,22 @@ class AppMonitorService : Service() {
         Log.d(TAG, "Foreground: $oldPkg -> $pkg")
         onAppChanged?.invoke(oldPkg, pkg)
 
-        // Check if blocked
+        // Check if blocked (manual block OR rule-based block)
         val groupId = appGroupMap[pkg]
-        if (groupId != null && blockedGroups.contains(groupId)) {
-            Log.i(TAG, "Blocked app detected: $pkg (group: $groupId)")
-            onBlockTriggered?.invoke(pkg, groupId)
-            showBlockingOverlay(pkg, groupId)
+        val shouldBlock = when {
+            // 1. Manually blocked group (e.g. via parent action)
+            groupId != null && blockedGroups.contains(groupId) -> true
+            // 2. Rule-based: time window or daily limit exceeded
+            groupId != null && ruleEvaluator?.isGroupAllowedNow(groupId, usageByGroup) == false -> true
+            // 3. No group mapping but device time window violated → block all unknown apps
+            groupId == null && ruleEvaluator?.isDeviceAllowedByTimeWindow() == false -> true
+            else -> false
+        }
+        if (shouldBlock) {
+            val blockGroup = groupId ?: "device"
+            Log.i(TAG, "Blocking app: $pkg (group: $blockGroup)")
+            onBlockTriggered?.invoke(pkg, blockGroup)
+            showBlockingOverlay(pkg, blockGroup)
         } else {
             hideBlockingOverlay()
         }
@@ -130,14 +148,54 @@ class AppMonitorService : Service() {
 
     private fun startMonitoring() {
         monitorJob = scope.launch {
+            var lastRuleEvalAt = 0L
             while (isActive) {
                 // Polling as fallback — primary detection is via A11y callback
                 val pkg = detectForegroundApp()
                 if (pkg != null) {
                     handleForegroundChange(pkg)
                 }
+
+                // Periodic rule re-evaluation + heartbeat sync
+                val now = System.currentTimeMillis()
+                if (now - lastRuleEvalAt >= RULE_EVAL_INTERVAL_MS) {
+                    lastRuleEvalAt = now
+                    reevaluateCurrentApp()
+                    // Notify MethodChannelHandler to send heartbeat + flush events
+                    val activePkg = currentForegroundPackage.ifEmpty { null }
+                    onSyncNeeded?.invoke(activePkg)
+                }
+
                 delay(POLL_INTERVAL_MS)
             }
+        }
+    }
+
+    /**
+     * Re-check the currently active app against rules without a foreground change.
+     * Handles cases like: blocked hours start while the same app is in the foreground,
+     * or a daily limit is hit during a long session.
+     */
+    internal fun reevaluateCurrentApp() {
+        val pkg = currentForegroundPackage
+        if (pkg.isEmpty()) return
+        val groupId = appGroupMap[pkg]
+        val alreadyBlocked = BlockingOverlayService.instance?.isShowing == true
+        val shouldBlock = when {
+            groupId != null && blockedGroups.contains(groupId) -> true
+            groupId != null && ruleEvaluator?.isGroupAllowedNow(groupId, usageByGroup) == false -> true
+            groupId == null && ruleEvaluator?.isDeviceAllowedByTimeWindow() == false -> true
+            else -> false
+        }
+        if (shouldBlock && !alreadyBlocked) {
+            val blockGroup = groupId ?: "device"
+            Log.i(TAG, "Rule re-eval blocked: $pkg (group: $blockGroup)")
+            onBlockTriggered?.invoke(pkg, blockGroup)
+            showBlockingOverlay(pkg, blockGroup)
+        } else if (!shouldBlock && alreadyBlocked) {
+            // Time window opened or limit reset — unblock
+            Log.i(TAG, "Rule re-eval unblocked: $pkg")
+            hideBlockingOverlay()
         }
     }
 
