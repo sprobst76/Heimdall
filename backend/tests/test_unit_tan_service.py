@@ -10,9 +10,9 @@ from app.services.tan_service import WORD_LIST, _generate_code
 
 class TestTANCodeGeneration:
     def test_code_format(self):
-        """Code should match WORD-NNNN pattern."""
+        """Code should match WORD-NNNNNN pattern (6-digit number)."""
         code = _generate_code()
-        assert re.match(r"^[A-Z]+-\d{4}$", code), f"Unexpected format: {code}"
+        assert re.match(r"^[A-Z]+-\d{6}$", code), f"Unexpected format: {code}"
 
     def test_code_word_from_list(self):
         """The word part should be from the mythological word list."""
@@ -20,12 +20,12 @@ class TestTANCodeGeneration:
         word = code.split("-")[0]
         assert word in WORD_LIST, f"{word} not in WORD_LIST"
 
-    def test_code_digits_four_chars(self):
-        """Digits should always be 4 characters (zero-padded)."""
+    def test_code_digits_six_chars(self):
+        """Digits should always be 6 characters (zero-padded)."""
         for _ in range(50):
             code = _generate_code()
             digits = code.split("-")[1]
-            assert len(digits) == 4
+            assert len(digits) == 6
 
     def test_codes_are_random(self):
         """Multiple generated codes should not all be identical."""

@@ -10,6 +10,7 @@ export function useRules(childId: string) {
       return data;
     },
     enabled: !!childId,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -23,6 +24,7 @@ export function useRule(childId: string, ruleId: string) {
       return data;
     },
     enabled: !!childId && !!ruleId,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

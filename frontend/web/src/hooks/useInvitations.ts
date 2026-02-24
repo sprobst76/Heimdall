@@ -10,6 +10,7 @@ export function useInvitations(familyId: string) {
       return data;
     },
     enabled: !!familyId,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

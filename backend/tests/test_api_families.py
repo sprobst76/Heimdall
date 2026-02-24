@@ -12,7 +12,7 @@ class TestGetFamily:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["name"] == "Test Familie"
+        assert data["name"] == p["family_name"]
         assert data["timezone"] == "Europe/Berlin"
         assert data["id"] == p["family_id"]
 

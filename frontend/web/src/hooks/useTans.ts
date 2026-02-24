@@ -10,6 +10,7 @@ export function useTans(childId: string, status?: string) {
       const { data } = await api.get<TAN[]>(`/children/${childId}/tans`, { params });
       return data;
     },
+    staleTime: 30_000,
   });
 }
 

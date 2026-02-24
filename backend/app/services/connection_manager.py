@@ -50,6 +50,7 @@ class ConnectionManager:
         """Send a message to a specific device.
 
         Returns True if sent successfully, False if not connected.
+        Cleans up stale connections on failure.
         """
         websocket = self._connections.get(device_id)
         if websocket is None:
@@ -60,6 +61,12 @@ class ConnectionManager:
             return True
         except Exception:
             logger.warning("Failed to send to device %s", device_id)
+            async with self._lock:
+                self._connections.pop(device_id, None)
+                for child_id, devices in list(self._child_devices.items()):
+                    devices.discard(device_id)
+                    if not devices:
+                        del self._child_devices[child_id]
             return False
 
     async def send_to_child_devices(
@@ -113,8 +120,10 @@ class ConnectionManager:
         """Send a message to all connected parent portals of a family.
 
         Returns the count of connections successfully notified.
+        Cleans up stale connections on failure.
         """
         sockets = self._parent_connections.get(family_id, set()).copy()
+        dead: set[WebSocket] = set()
         count = 0
         for ws in sockets:
             try:
@@ -122,6 +131,9 @@ class ConnectionManager:
                 count += 1
             except Exception:
                 logger.warning("Failed to send to parent portal for family %s", family_id)
+                dead.add(ws)
+        for ws in dead:
+            await self.disconnect_parent(family_id, ws)
         return count
 
 

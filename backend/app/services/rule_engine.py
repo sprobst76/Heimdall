@@ -7,13 +7,16 @@ Resolves the currently active rules for a device based on:
 - Currently active TANs
 """
 
+import json
 import uuid
 from datetime import date, datetime, time, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sqlalchemy import func
+from app.core.redis_client import get_redis
+
+RULES_CACHE_TTL = 30  # seconds
 
 from app.models.day_type import DayTypeOverride
 from app.models.device import Device, DeviceCoupling
@@ -66,8 +69,35 @@ async def get_today_day_type(
 async def get_current_rules(
     db: AsyncSession,
     device_id: uuid.UUID,
+    bypass_cache: bool = False,
 ) -> dict:
     """Resolve the currently active rules for a device.
+
+    Returns the cached result if available (TTL 30s), unless bypass_cache=True.
+    Use bypass_cache=True when pushing rules after a mutation so the cache is
+    refreshed immediately.
+    """
+    cache_key = f"rules:device:{device_id}"
+    redis = await get_redis()
+
+    if not bypass_cache and redis is not None:
+        cached = await redis.get(cache_key)
+        if cached:
+            return json.loads(cached)
+
+    result = await _compute_current_rules(db, device_id)
+
+    if redis is not None:
+        await redis.setex(cache_key, RULES_CACHE_TTL, json.dumps(result, default=str))
+
+    return result
+
+
+async def _compute_current_rules(
+    db: AsyncSession,
+    device_id: uuid.UUID,
+) -> dict:
+    """Compute the currently active rules for a device (no caching).
 
     Steps:
     1. Get device and child
@@ -78,15 +108,6 @@ async def get_current_rules(
     6. Calculate usage (considering coupled devices if shared_budget)
     7. Get active TANs
     8. Return resolved rules dict
-
-    Args:
-        db: Async database session.
-        device_id: The device to resolve rules for.
-
-    Returns:
-        Dict with keys: day_type, time_windows, group_limits,
-        daily_limit_minutes, remaining_minutes, active_tans,
-        coupled_devices, shared_budget.
     """
     empty_result = {
         "day_type": "unknown",
@@ -139,24 +160,19 @@ async def get_current_rules(
     # 3. Determine today's day type
     day_type = await get_today_day_type(db, child.family_id, today)
 
-    # 4. Get all active TimeRules matching the day type
+    # 4. Get active TimeRules valid for today (date range filtered in SQL)
     rules_result = await db.execute(
         select(TimeRule).where(
             TimeRule.child_id == child_id,
             TimeRule.active == True,  # noqa: E712
+            or_(TimeRule.valid_from.is_(None), TimeRule.valid_from <= today),
+            or_(TimeRule.valid_until.is_(None), TimeRule.valid_until >= today),
         )
     )
     all_rules = rules_result.scalars().all()
 
-    matching_rules = []
-    for rule in all_rules:
-        if day_type not in (rule.day_types or []):
-            continue
-        if rule.valid_from is not None and today < rule.valid_from:
-            continue
-        if rule.valid_until is not None and today > rule.valid_until:
-            continue
-        matching_rules.append(rule)
+    # day_types is a JSON array — filter in Python (DB-agnostic)
+    matching_rules = [r for r in all_rules if day_type in (r.day_types or [])]
 
     # 5. Sort by priority (highest first)
     matching_rules.sort(key=lambda r: r.priority, reverse=True)

@@ -21,6 +21,7 @@ export function useQuestTemplates(familyId: string) {
       return data;
     },
     enabled: !!familyId,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -74,6 +75,7 @@ export function useChildQuests(childId: string, status?: string) {
       return data;
     },
     enabled: !!childId,
+    staleTime: 30_000,
   });
 }
 
@@ -149,6 +151,7 @@ export function useQuestStats(childId: string) {
       return data;
     },
     enabled: !!childId,
+    staleTime: 30_000,
   });
 }
 

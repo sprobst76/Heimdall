@@ -16,6 +16,7 @@ export function useDayTypes(familyId: string, dateFrom?: string, dateTo?: string
       return data;
     },
     enabled: !!familyId,
+    staleTime: 30_000,
   });
 }
 
@@ -30,6 +31,7 @@ export function useTodayDayType(familyId: string) {
       return data.length > 0 ? data[0] : null;
     },
     enabled: !!familyId,
+    staleTime: 30_000,
   });
 }
 

@@ -56,6 +56,20 @@ async def _setup_tables():
 
 
 # ---------------------------------------------------------------------------
+# Reset rate-limiter counters before every test
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    """Clear in-memory rate-limit counters so tests never block each other."""
+    from app.core.rate_limit import limiter
+
+    storage = getattr(limiter, "_storage", None)
+    if storage is not None and hasattr(storage, "reset"):
+        storage.reset()
+
+
+# ---------------------------------------------------------------------------
 # Per-test session with rollback
 # ---------------------------------------------------------------------------
 
@@ -100,12 +114,14 @@ async def registered_parent(client: AsyncClient, db_session: AsyncSession):
     from app.core.security import decode_token
     from app.models.user import User
 
-    email = f"parent-{uuid.uuid4().hex[:8]}@test.de"
+    suffix = uuid.uuid4().hex[:8]
+    email = f"parent-{suffix}@test.de"
+    family_name = f"Test Familie {suffix}"
     resp = await client.post("/api/v1/auth/register", json={
         "email": email,
         "password": "testpassword123",
         "name": "Test Eltern",
-        "family_name": "Test Familie",
+        "family_name": family_name,
     })
     assert resp.status_code == 200, resp.text
     tokens = resp.json()
@@ -121,6 +137,7 @@ async def registered_parent(client: AsyncClient, db_session: AsyncSession):
         "headers": headers,
         "user_id": str(user.id),
         "family_id": str(user.family_id),
+        "family_name": family_name,
         "email": email,
         "tokens": tokens,
     }

@@ -42,62 +42,43 @@ async def get_family_dashboard_stats(
     db: AsyncSession,
     family_id: uuid.UUID,
 ) -> dict:
-    """Get aggregate stats for family dashboard header cards."""
+    """Get aggregate stats for family dashboard header cards.
+
+    Single DB roundtrip using scalar subqueries.
+    """
 
     today_start, today_end = _day_bounds(date.today())
 
-    # All child IDs in the family
-    children_q = select(User.id).where(
-        and_(User.family_id == family_id, User.role == "child"),
+    # Child-IDs as reusable subquery
+    children_subq = select(User.id).where(
+        User.family_id == family_id, User.role == "child"
     )
-    children_result = await db.execute(children_q)
-    child_ids: list[uuid.UUID] = list(children_result.scalars().all())
-    total_children: int = len(child_ids)
 
-    if not child_ids:
-        return dict(
-            total_children=0,
-            total_active_rules=0,
-            tans_today=0,
-            total_usage_today_minutes=0,
-        )
-
-    # Active time rules across all children
-    rules_q = select(func.count()).select_from(TimeRule).where(
-        and_(TimeRule.child_id.in_(child_ids), TimeRule.active.is_(True)),
-    )
-    rules_result = await db.execute(rules_q)
-    total_active_rules: int = rules_result.scalar_one()
-
-    # TANs created today
-    tans_q = select(func.count()).select_from(TAN).where(
-        and_(
-            TAN.child_id.in_(child_ids),
+    row = (await db.execute(select(
+        select(func.count(User.id)).where(
+            User.family_id == family_id, User.role == "child"
+        ).scalar_subquery().label("total_children"),
+        select(func.count()).select_from(TimeRule).where(
+            TimeRule.child_id.in_(children_subq),
+            TimeRule.active.is_(True),
+        ).scalar_subquery().label("total_active_rules"),
+        select(func.count()).select_from(TAN).where(
+            TAN.child_id.in_(children_subq),
             TAN.created_at >= today_start,
             TAN.created_at < today_end,
-        ),
-    )
-    tans_result = await db.execute(tans_q)
-    tans_today: int = tans_result.scalar_one()
-
-    # Total usage today (minutes)
-    usage_q = select(
-        func.coalesce(func.sum(UsageEvent.duration_seconds), 0),
-    ).where(
-        and_(
-            UsageEvent.child_id.in_(child_ids),
+        ).scalar_subquery().label("tans_today"),
+        select(func.coalesce(func.sum(UsageEvent.duration_seconds), 0)).where(
+            UsageEvent.child_id.in_(children_subq),
             UsageEvent.started_at >= today_start,
             UsageEvent.started_at < today_end,
-        ),
-    )
-    usage_result = await db.execute(usage_q)
-    total_usage_seconds: int = usage_result.scalar_one()
+        ).scalar_subquery().label("usage_seconds"),
+    ))).one()
 
     return dict(
-        total_children=total_children,
-        total_active_rules=total_active_rules,
-        tans_today=tans_today,
-        total_usage_today_minutes=total_usage_seconds // 60,
+        total_children=row.total_children,
+        total_active_rules=row.total_active_rules,
+        tans_today=row.tans_today,
+        total_usage_today_minutes=row.usage_seconds // 60,
     )
 
 
@@ -109,68 +90,54 @@ async def get_child_dashboard_stats(
     db: AsyncSession,
     child_id: uuid.UUID,
 ) -> dict:
-    """Get real-time stats for one child."""
+    """Get real-time stats for one child.
+
+    Combines 6 scalar lookups into a single DB roundtrip.
+    Streak and top-group remain separate (GROUP BY / JOIN logic).
+    """
 
     today_start, today_end = _day_bounds(date.today())
     now = datetime.now(timezone.utc)
     five_minutes_ago = now - timedelta(minutes=5)
 
-    # --- child name ---
-    child_q = select(User.name).where(User.id == child_id)
-    child_result = await db.execute(child_q)
-    child_name: str = child_result.scalar_one()
-
-    # --- usage today (minutes) ---
-    usage_q = select(
-        func.coalesce(func.sum(UsageEvent.duration_seconds), 0),
-    ).where(
-        and_(
+    # --- 6 metrics in one roundtrip via scalar subqueries ---
+    row = (await db.execute(select(
+        select(User.name).where(User.id == child_id)
+            .scalar_subquery().label("child_name"),
+        select(func.coalesce(func.sum(UsageEvent.duration_seconds), 0)).where(
             UsageEvent.child_id == child_id,
             UsageEvent.started_at >= today_start,
             UsageEvent.started_at < today_end,
-        ),
-    )
-    usage_result = await db.execute(usage_q)
-    usage_today_seconds: int = usage_result.scalar_one()
-
-    # --- daily limit (most restrictive active rule) ---
-    limit_q = select(func.min(TimeRule.daily_limit_minutes)).where(
-        and_(TimeRule.child_id == child_id, TimeRule.active.is_(True)),
-    )
-    limit_result = await db.execute(limit_q)
-    daily_limit_minutes: int | None = limit_result.scalar_one()
-
-    # --- active TANs ---
-    tans_q = select(func.count()).select_from(TAN).where(
-        and_(TAN.child_id == child_id, TAN.status == "active"),
-    )
-    tans_result = await db.execute(tans_q)
-    active_tans: int = tans_result.scalar_one()
-
-    # --- quests completed today ---
-    quests_q = select(func.count()).select_from(QuestInstance).where(
-        and_(
+        ).scalar_subquery().label("usage_seconds"),
+        select(func.min(TimeRule.daily_limit_minutes)).where(
+            TimeRule.child_id == child_id,
+            TimeRule.active.is_(True),
+        ).scalar_subquery().label("daily_limit_minutes"),
+        select(func.count()).select_from(TAN).where(
+            TAN.child_id == child_id,
+            TAN.status == "active",
+        ).scalar_subquery().label("active_tans"),
+        select(func.count()).select_from(QuestInstance).where(
             QuestInstance.child_id == child_id,
             QuestInstance.status == "approved",
             QuestInstance.reviewed_at >= today_start,
             QuestInstance.reviewed_at < today_end,
-        ),
-    )
-    quests_result = await db.execute(quests_q)
-    quests_completed_today: int = quests_result.scalar_one()
+        ).scalar_subquery().label("quests_completed_today"),
+        select(func.count()).select_from(Device).where(
+            Device.child_id == child_id,
+            Device.last_seen >= five_minutes_ago,
+        ).scalar_subquery().label("devices_online"),
+    ))).one()
+
+    child_name: str = row.child_name
+    usage_today_seconds: int = row.usage_seconds
+    daily_limit_minutes: int | None = row.daily_limit_minutes
+    active_tans: int = row.active_tans
+    quests_completed_today: int = row.quests_completed_today
+    devices_online: int = row.devices_online
 
     # --- current streak (consecutive days with approved quests) ---
     current_streak = await _compute_quest_streak(db, child_id)
-
-    # --- devices online (last_seen within 5 minutes) ---
-    devices_q = select(func.count()).select_from(Device).where(
-        and_(
-            Device.child_id == child_id,
-            Device.last_seen >= five_minutes_ago,
-        ),
-    )
-    devices_result = await db.execute(devices_q)
-    devices_online: int = devices_result.scalar_one()
 
     # --- top group today ---
     top_group_q = (

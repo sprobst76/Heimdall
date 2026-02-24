@@ -15,6 +15,7 @@ export function useAppGroups(childId: string) {
       const { data } = await api.get<AppGroup[]>(`/children/${childId}/app-groups`);
       return data;
     },
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -27,6 +28,7 @@ export function useAppGroup(childId: string, groupId: string) {
       );
       return data;
     },
+    staleTime: 5 * 60 * 1000,
   });
 }
 

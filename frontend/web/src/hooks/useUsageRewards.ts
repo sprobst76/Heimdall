@@ -10,6 +10,7 @@ export function useUsageRewards(childId: string) {
       return data;
     },
     enabled: !!childId,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

@@ -10,6 +10,7 @@ export function useChildren(familyId: string) {
       return data;
     },
     enabled: !!familyId,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -21,6 +22,7 @@ export function useChild(familyId: string, childId: string) {
       return data;
     },
     enabled: !!familyId && !!childId,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

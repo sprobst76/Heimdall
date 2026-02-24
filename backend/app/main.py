@@ -4,16 +4,19 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.rate_limit import limiter
+from app.database import get_db
 from app.routers import agent, analytics, app_groups, auth, children, day_types, devices, families, llm, portal_ws, quests, tan_schedules, tans, time_rules, totp, uploads, usage_rewards
 
 logger = logging.getLogger(__name__)
@@ -95,6 +98,51 @@ async def _tan_schedule_loop() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Data cleanup background task
+# ---------------------------------------------------------------------------
+async def _cleanup_loop() -> None:
+    """Delete stale data daily at 03:00 UTC.
+
+    - UsageEvents older than 90 days (analytics reports cover max 90 days)
+    - TANs with status redeemed/expired older than 30 days (audit trail)
+    """
+    from app.database import async_session
+    from app.models.tan import TAN
+    from app.models.usage import UsageEvent
+
+    while True:
+        # Sleep until 03:00 UTC today (or tomorrow if already past)
+        now = datetime.now(timezone.utc)
+        target = now.replace(hour=3, minute=0, second=0, microsecond=0)
+        if target <= now:
+            target += timedelta(days=1)
+        await asyncio.sleep((target - now).total_seconds())
+
+        try:
+            cutoff_usage = datetime.now(timezone.utc) - timedelta(days=90)
+            cutoff_tans = datetime.now(timezone.utc) - timedelta(days=30)
+
+            async with async_session() as db:
+                result_usage = await db.execute(
+                    delete(UsageEvent).where(UsageEvent.started_at < cutoff_usage)
+                )
+                result_tans = await db.execute(
+                    delete(TAN).where(
+                        TAN.status.in_(["redeemed", "expired"]),
+                        TAN.expires_at < cutoff_tans,
+                    )
+                )
+                await db.commit()
+                logger.info(
+                    "Cleanup: %d usage events, %d TANs removed",
+                    result_usage.rowcount,
+                    result_tans.rowcount,
+                )
+        except Exception:
+            logger.exception("Cleanup error")
+
+
+# ---------------------------------------------------------------------------
 # Holiday Sync background task
 # ---------------------------------------------------------------------------
 async def _holiday_sync_loop() -> None:
@@ -136,11 +184,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     reward_task = asyncio.create_task(_usage_reward_loop())
     tan_schedule_task = asyncio.create_task(_tan_schedule_loop())
     holiday_task = asyncio.create_task(_holiday_sync_loop())
+    cleanup_task = asyncio.create_task(_cleanup_loop())
     yield
+    cleanup_task.cancel()
     holiday_task.cancel()
     tan_schedule_task.cancel()
     reward_task.cancel()
     scheduler_task.cancel()
+    from app.core.redis_client import close_redis
+    await close_redis()
     logger.info("Heimdall API shutting down")
 
 
@@ -181,6 +233,7 @@ async def fix_redirect_scheme(request: Request, call_next):
     return await call_next(request)
 
 
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -198,9 +251,29 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Health check
 # ---------------------------------------------------------------------------
 @app.get("/health", tags=["health"])
-async def health_check():
-    """Simple health check endpoint."""
-    return {"status": "ok", "app": settings.APP_NAME}
+async def health_check(db: AsyncSession = Depends(get_db)):
+    """Health check with DB and Redis connectivity verification."""
+    from app.core.redis_client import get_redis
+
+    checks: dict[str, str] = {"db": "ok", "redis": "ok"}
+
+    try:
+        await db.execute(select(1))
+    except Exception:
+        checks["db"] = "error"
+
+    try:
+        redis = await get_redis()
+        if redis is None:
+            checks["redis"] = "unavailable"
+        else:
+            await redis.ping()
+    except Exception:
+        checks["redis"] = "error"
+
+    # "unavailable" = optional service not configured; only "error" = degraded
+    degraded = any(v == "error" for v in checks.values())
+    return {"status": "degraded" if degraded else "ok", "app": settings.APP_NAME, **checks}
 
 
 # ---------------------------------------------------------------------------

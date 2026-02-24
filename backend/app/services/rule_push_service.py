@@ -35,7 +35,7 @@ async def push_rules_to_child_devices(
 
     count = 0
     for device in devices:
-        rules = await get_current_rules(db, device.id)
+        rules = await get_current_rules(db, device.id, bypass_cache=True)
         message = {"type": "rules_updated", "rules": rules}
         if await connection_manager.send_to_device(device.id, message):
             count += 1
@@ -55,7 +55,7 @@ async def push_rules_to_device(
 
     Returns True if the device was notified.
     """
-    rules = await get_current_rules(db, device_id)
+    rules = await get_current_rules(db, device_id, bypass_cache=True)
     message = {"type": "rules_updated", "rules": rules}
     return await connection_manager.send_to_device(device_id, message)
 

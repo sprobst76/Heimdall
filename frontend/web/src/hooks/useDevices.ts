@@ -12,6 +12,7 @@ export function useChildDevices(childId: string) {
       return data;
     },
     enabled: !!childId,
+    staleTime: 30_000,
   });
 }
 

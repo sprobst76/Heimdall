@@ -10,7 +10,8 @@ export function useFamilyDashboard(familyId: string) {
       return data;
     },
     enabled: !!familyId,
-    refetchInterval: 60_000,  // fallback polling; WebSocket handles real-time
+    refetchInterval: 120_000,  // fallback polling; WebSocket handles real-time
+    staleTime: 30_000,
   });
 }
 
@@ -22,7 +23,8 @@ export function useChildDashboard(childId: string) {
       return data;
     },
     enabled: !!childId,
-    refetchInterval: 60_000,
+    refetchInterval: 120_000,
+    staleTime: 30_000,
   });
 }
 
@@ -36,5 +38,6 @@ export function useChildAnalytics(childId: string, period: string, startDate: st
       return data;
     },
     enabled: !!childId && !!startDate && !!endDate,
+    staleTime: 10 * 60 * 1000,  // historical data doesn't change
   });
 }
