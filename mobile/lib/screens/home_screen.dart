@@ -23,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _overlayShown = false;
   bool _lockdownShown = false;
   bool _tamperDialogShown = false;
+  bool _vpnDialogShown = false;
 
   final _screens = const [
     QuestOverviewScreen(),
@@ -36,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     AgentBridge.onLimitWarning = _handleLimitWarning;
     AgentBridge.onTamperDetected = _handleTamperDetected;
+    AgentBridge.onVpnDetected = _handleVpnDetected;
     if (Platform.isWindows) {
       AgentBridge.onBlockTriggered = _handleBlockTriggered;
       // Wire up full lockdown callbacks
@@ -51,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     AgentBridge.onLimitWarning = null;
     AgentBridge.onTamperDetected = null;
+    AgentBridge.onVpnDetected = null;
     if (Platform.isWindows) {
       AgentBridge.onBlockTriggered = null;
       final service = AgentBridge.windowsBridge?.service;
@@ -143,6 +146,38 @@ class _HomeScreenState extends State<HomeScreen> {
           FilledButton(
             onPressed: () {
               _tamperDialogShown = false;
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Verstanden'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleVpnDetected(String reason) {
+    if (_vpnDialogShown || !mounted) return;
+    _vpnDialogShown = true;
+    final label = reason == 'proxy' ? 'Proxy' : 'VPN';
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.vpn_lock, color: Color(0xFFEF4444), size: 40),
+        title: Text(
+          '$label erkannt',
+          textAlign: TextAlign.center,
+        ),
+        content: Text(
+          'Ein $label wurde auf diesem Gerät aktiviert.\n\n'
+          'Deine Eltern wurden benachrichtigt.',
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          FilledButton(
+            onPressed: () {
+              _vpnDialogShown = false;
               Navigator.of(ctx).pop();
             },
             child: const Text('Verstanden'),

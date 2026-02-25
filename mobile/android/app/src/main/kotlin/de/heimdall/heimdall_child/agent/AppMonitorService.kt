@@ -59,6 +59,11 @@ class AppMonitorService : Service() {
     var onTamperDetected: ((reason: String) -> Unit)? = null
     /** Fired when a group is approaching its daily limit (≤5 min remaining). */
     var onLimitWarning: ((groupId: String, remainingMinutes: Int) -> Unit)? = null
+    /** Fired when an active VPN or proxy is detected (once per session, resets at midnight). */
+    var onVpnDetected: ((reason: String) -> Unit)? = null
+
+    // Tracks the VPN/proxy state to fire the callback only on transitions (off → on)
+    private var lastVpnReason: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -197,6 +202,7 @@ class AppMonitorService : Service() {
                     checkDailyReset()
                     reevaluateCurrentApp()
                     checkApproachingLimits()
+                    checkVpnProxy()
                     // Notify MethodChannelHandler to send heartbeat + flush events
                     val activePkg = currentForegroundPackage.ifEmpty { null }
                     onSyncNeeded?.invoke(activePkg)
@@ -268,6 +274,7 @@ class AppMonitorService : Service() {
     fun resetDailyUsage() {
         usageByGroup.clear()
         warnedLimitGroups.clear()
+        lastVpnReason = null
         Log.i(TAG, "Daily usage counters reset")
     }
 
@@ -289,6 +296,24 @@ class AppMonitorService : Service() {
      * Check all known app groups for approaching daily limits.
      * Fires onLimitWarning when a group has ≤5 minutes remaining (once per day per group).
      */
+    /**
+     * Check for active VPN or proxy. Fires onVpnDetected only when the state
+     * changes from "none" to "detected" — not on every polling tick.
+     * lastVpnReason is reset at midnight (via resetDailyUsage).
+     */
+    private fun checkVpnProxy() {
+        val reason = VpnDetector.detect(this)
+        if (reason != null && lastVpnReason == null) {
+            lastVpnReason = reason
+            Log.w(TAG, "VPN/proxy detected: $reason")
+            onVpnDetected?.invoke(reason)
+        } else if (reason == null && lastVpnReason != null) {
+            // VPN was removed — reset so we alert again if it comes back
+            lastVpnReason = null
+            Log.i(TAG, "VPN/proxy no longer active")
+        }
+    }
+
     private fun checkApproachingLimits() {
         val evaluator = ruleEvaluator ?: return
         val groups = appGroupMap.values.toSet()

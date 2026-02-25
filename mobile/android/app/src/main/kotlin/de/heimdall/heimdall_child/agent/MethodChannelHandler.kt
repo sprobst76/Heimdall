@@ -159,6 +159,20 @@ class MethodChannelHandler(
                 Log.i(TAG, "Limit warning sent to Flutter: group=$groupId remaining=${remainingMinutes}min")
             }
         }
+
+        monitor.onVpnDetected = { reason ->
+            scope.launch(Dispatchers.IO) {
+                try {
+                    communication?.sendTamperAlert("vpn_detected:$reason")
+                    Log.w(TAG, "VPN/proxy tamper alert sent: $reason")
+                } catch (e: Exception) {
+                    Log.w(TAG, "VPN tamper alert failed: ${e.message}")
+                }
+            }
+            scope.launch(Dispatchers.Main) {
+                channel.invokeMethod("onVpnDetected", mapOf("reason" to reason))
+            }
+        }
     }
 
     /** Send all queued offline events to the backend. */

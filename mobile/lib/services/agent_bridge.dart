@@ -20,6 +20,8 @@ class AgentBridge {
   static Function(String groupId, int remainingMinutes)? onLimitWarning;
   /// Fired when the monitoring service detects it was previously force-killed.
   static Function(String reason)? onTamperDetected;
+  /// Fired when an active VPN or proxy is detected.
+  static Function(String reason)? onVpnDetected;
 
   // -- Android MethodChannel --
   static const _channel = MethodChannel('de.heimdall/agent');
@@ -57,6 +59,10 @@ class AgentBridge {
       case 'onTamperDetected':
         final reason = call.arguments['reason'] as String? ?? 'unknown';
         onTamperDetected?.call(reason);
+        break;
+      case 'onVpnDetected':
+        final reason = call.arguments['reason'] as String? ?? 'unknown';
+        onVpnDetected?.call(reason);
         break;
     }
   }
