@@ -8,6 +8,16 @@ class HeartbeatRequest(BaseModel):
     timestamp: datetime
     battery_level: int | None = None
     active_app: str | None = None
+    safe_mode: bool = False
+
+
+class TamperAlertRequest(BaseModel):
+    timestamp: datetime
+    reason: str  # e.g. "service_killed"
+
+
+class TamperAlertResponse(BaseModel):
+    status: str = "received"
 
 
 class HeartbeatResponse(BaseModel):

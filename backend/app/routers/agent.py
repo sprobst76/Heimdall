@@ -21,6 +21,8 @@ from app.schemas.agent import (
     HeartbeatRequest,
     HeartbeatResponse,
     ResolvedRules,
+    TamperAlertRequest,
+    TamperAlertResponse,
     UsageEventRequest,
     UsageEventResponse,
 )
@@ -75,6 +77,42 @@ async def heartbeat(
         status="ok",
         server_time=datetime.now(timezone.utc),
     )
+
+
+@router.post("/tamper-alert", response_model=TamperAlertResponse)
+async def tamper_alert(
+    body: TamperAlertRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    device: Device = Depends(get_device_by_token),
+):
+    """Device reports a tamper attempt (e.g. monitoring service was force-killed).
+
+    Notifies the parent dashboard in real time so parents can react.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        "Tamper alert from device %s (%s): reason=%s timestamp=%s",
+        device.id,
+        device.name,
+        body.reason,
+        body.timestamp.isoformat(),
+    )
+
+    # Resolve family for parent notification
+    child_result = await db.execute(select(User).where(User.id == device.child_id))
+    child = child_result.scalar_one_or_none()
+    if child:
+        await notify_parent_dashboard(child.family_id, child.id, "tamper")
+        await notify_parent_event(
+            child.family_id,
+            "Sicherheitswarnung",
+            f"Gerät '{device.name or 'Unbekannt'}' meldet Manipulationsversuch: {body.reason}",
+            "tamper",
+            child.id,
+        )
+
+    return TamperAlertResponse()
 
 
 @router.post("/usage-event", response_model=UsageEventResponse)
