@@ -22,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   bool _overlayShown = false;
   bool _lockdownShown = false;
+  bool _tamperDialogShown = false;
 
   final _screens = const [
     QuestOverviewScreen(),
@@ -33,6 +34,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    AgentBridge.onLimitWarning = _handleLimitWarning;
+    AgentBridge.onTamperDetected = _handleTamperDetected;
     if (Platform.isWindows) {
       AgentBridge.onBlockTriggered = _handleBlockTriggered;
       // Wire up full lockdown callbacks
@@ -46,6 +49,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    AgentBridge.onLimitWarning = null;
+    AgentBridge.onTamperDetected = null;
     if (Platform.isWindows) {
       AgentBridge.onBlockTriggered = null;
       final service = AgentBridge.windowsBridge?.service;
@@ -78,6 +83,71 @@ class _HomeScreenState extends State<HomeScreen> {
             Navigator.of(context).pop();
           },
         ),
+      ),
+    );
+  }
+
+  void _handleLimitWarning(String groupId, int remainingMinutes) {
+    if (!mounted) return;
+    final label = remainingMinutes == 1 ? '1 Minute' : '$remainingMinutes Minuten';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 8),
+        backgroundColor: const Color(0xFFF59E0B), // amber-500
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        content: Row(
+          children: [
+            const Icon(Icons.timer_outlined, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Noch $label Bildschirmzeit!',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        action: SnackBarAction(
+          label: 'OK',
+          textColor: Colors.white,
+          onPressed: () =>
+              ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+        ),
+      ),
+    );
+  }
+
+  void _handleTamperDetected(String reason) {
+    if (_tamperDialogShown || !mounted) return;
+    _tamperDialogShown = true;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.security, color: Color(0xFFEF4444), size: 40),
+        title: const Text(
+          'Schutz unterbrochen',
+          textAlign: TextAlign.center,
+        ),
+        content: const Text(
+          'Der Heimdall-Schutz wurde kurz deaktiviert.\n\n'
+          'Deine Eltern wurden bereits benachrichtigt.',
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          FilledButton(
+            onPressed: () {
+              _tamperDialogShown = false;
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Verstanden'),
+          ),
+        ],
       ),
     );
   }

@@ -16,6 +16,10 @@ class AgentBridge {
   // Callbacks from native / agent
   static Function(String packageName)? onAppChanged;
   static Function(String packageName, String groupId)? onBlockTriggered;
+  /// Fired when a group is approaching its daily limit (≤5 min remaining).
+  static Function(String groupId, int remainingMinutes)? onLimitWarning;
+  /// Fired when the monitoring service detects it was previously force-killed.
+  static Function(String reason)? onTamperDetected;
 
   // -- Android MethodChannel --
   static const _channel = MethodChannel('de.heimdall/agent');
@@ -44,6 +48,15 @@ class AgentBridge {
         final pkg = call.arguments['packageName'] as String;
         final groupId = call.arguments['groupId'] as String;
         onBlockTriggered?.call(pkg, groupId);
+        break;
+      case 'onLimitWarning':
+        final groupId = call.arguments['groupId'] as String;
+        final remaining = call.arguments['remainingMinutes'] as int;
+        onLimitWarning?.call(groupId, remaining);
+        break;
+      case 'onTamperDetected':
+        final reason = call.arguments['reason'] as String? ?? 'unknown';
+        onTamperDetected?.call(reason);
         break;
     }
   }
