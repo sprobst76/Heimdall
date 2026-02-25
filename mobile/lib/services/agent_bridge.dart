@@ -22,6 +22,8 @@ class AgentBridge {
   static Function(String reason)? onTamperDetected;
   /// Fired when an active VPN or proxy is detected.
   static Function(String reason)? onVpnDetected;
+  /// Fired when a new app is installed (blocked pending parent approval).
+  static Function(String packageName)? onPackageInstalled;
 
   // -- Android MethodChannel --
   static const _channel = MethodChannel('de.heimdall/agent');
@@ -63,6 +65,10 @@ class AgentBridge {
       case 'onVpnDetected':
         final reason = call.arguments['reason'] as String? ?? 'unknown';
         onVpnDetected?.call(reason);
+        break;
+      case 'onPackageInstalled':
+        final pkg = call.arguments['packageName'] as String? ?? '';
+        onPackageInstalled?.call(pkg);
         break;
     }
   }
@@ -175,6 +181,12 @@ class AgentBridge {
   static Future<void> hideBlockOverlay() async {
     if (_windowsBridge != null) return;
     await _channel.invokeMethod('hideBlockOverlay');
+  }
+
+  /// Parent approves a newly installed package — removes it from the block list.
+  static Future<void> approvePackage(String packageName) async {
+    if (_windowsBridge != null) return;
+    await _channel.invokeMethod('approvePackage', {'packageName': packageName});
   }
 
   // -- Windows-specific access --

@@ -82,6 +82,17 @@
             </intent-filter>
         </receiver>
 
+        <!-- Package install watcher: blocks new installs pending parent approval.
+             ACTION_PACKAGE_ADDED is exempt from Android 8+ broadcast restrictions. -->
+        <receiver
+            android:name=".agent.PackageInstallReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

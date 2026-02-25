@@ -52,7 +52,11 @@ class AppMonitorService : Service() {
     var onAppChanged: ((oldPkg: String, newPkg: String) -> Unit)? = null
     var appGroupMap: Map<String, String> = emptyMap()  // packageName -> groupId
     var blockedGroups: MutableSet<String> = mutableSetOf()  // manually blocked groups
+    /** Packages blocked pending parent approval (new installs). */
+    val blockedPackages: MutableSet<String> = mutableSetOf()
     var onBlockTriggered: ((packageName: String, groupId: String) -> Unit)? = null
+    /** Fired when PackageInstallReceiver detects a new app installation. */
+    var onPackageInstalled: ((packageName: String) -> Unit)? = null
     /** Called every ~60s by the monitoring loop. Used by MethodChannelHandler to send heartbeats. */
     var onSyncNeeded: (suspend (activePackage: String?) -> Unit)? = null
     /** Fired when the service detects it was previously force-killed (tamper attempt). */
@@ -71,6 +75,7 @@ class AppMonitorService : Service() {
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification())
         checkTamper()
+        restoreQueuedBlockedPackages()
         // Register for instant A11y notifications (much faster than polling)
         HeimdallAccessibilityService.onAppChanged = { pkg ->
             handleForegroundChange(pkg)
@@ -164,14 +169,16 @@ class AppMonitorService : Service() {
         Log.d(TAG, "Foreground: $oldPkg -> $pkg")
         onAppChanged?.invoke(oldPkg, pkg)
 
-        // Check if blocked (manual block OR rule-based block)
+        // Check if blocked (package-level, group-level, or rule-based)
         val groupId = appGroupMap[pkg]
         val shouldBlock = when {
-            // 1. Manually blocked group (e.g. via parent action)
+            // 1. Package blocked pending parent approval (new install)
+            blockedPackages.contains(pkg) -> true
+            // 2. Manually blocked group (e.g. via parent action)
             groupId != null && blockedGroups.contains(groupId) -> true
-            // 2. Rule-based: time window or daily limit exceeded
+            // 3. Rule-based: time window or daily limit exceeded
             groupId != null && ruleEvaluator?.isGroupAllowedNow(groupId, usageByGroup) == false -> true
-            // 3. No group mapping but device time window violated → block all unknown apps
+            // 4. No group mapping but device time window violated → block all unknown apps
             groupId == null && ruleEvaluator?.isDeviceAllowedByTimeWindow() == false -> true
             else -> false
         }
@@ -224,6 +231,7 @@ class AppMonitorService : Service() {
         val groupId = appGroupMap[pkg]
         val alreadyBlocked = BlockingOverlayService.instance?.isShowing == true
         val shouldBlock = when {
+            blockedPackages.contains(pkg) -> true
             groupId != null && blockedGroups.contains(groupId) -> true
             groupId != null && ruleEvaluator?.isGroupAllowedNow(groupId, usageByGroup) == false -> true
             groupId == null && ruleEvaluator?.isDeviceAllowedByTimeWindow() == false -> true
@@ -266,6 +274,29 @@ class AppMonitorService : Service() {
         } catch (e: Exception) {
             Log.w(TAG, "UsageStats fallback failed", e)
             null
+        }
+    }
+
+    /** Remove a package from pending-approval blocking (parent approved the install). */
+    fun approvePackage(packageName: String) {
+        blockedPackages.remove(packageName)
+        // Also remove from persisted queue
+        val prefs = getSharedPreferences("heimdall_state", Context.MODE_PRIVATE)
+        val current = prefs.getStringSet("blocked_new_packages", mutableSetOf()) ?: mutableSetOf()
+        prefs.edit().putStringSet("blocked_new_packages", current - packageName).apply()
+        reevaluateCurrentApp()
+        Log.i(TAG, "Package approved by parent: $packageName")
+    }
+
+    /**
+     * On service start, restore packages that were blocked by PackageInstallReceiver
+     * while the monitor service was not yet running.
+     */
+    private fun restoreQueuedBlockedPackages() {
+        val queued = statePrefs.getStringSet("blocked_new_packages", emptySet()) ?: emptySet()
+        if (queued.isNotEmpty()) {
+            blockedPackages.addAll(queued)
+            Log.i(TAG, "Restored ${queued.size} queued blocked package(s): $queued")
         }
     }
 

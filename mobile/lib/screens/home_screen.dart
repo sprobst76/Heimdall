@@ -24,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _lockdownShown = false;
   bool _tamperDialogShown = false;
   bool _vpnDialogShown = false;
+  bool _installDialogShown = false;
 
   final _screens = const [
     QuestOverviewScreen(),
@@ -38,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
     AgentBridge.onLimitWarning = _handleLimitWarning;
     AgentBridge.onTamperDetected = _handleTamperDetected;
     AgentBridge.onVpnDetected = _handleVpnDetected;
+    AgentBridge.onPackageInstalled = _handlePackageInstalled;
     if (Platform.isWindows) {
       AgentBridge.onBlockTriggered = _handleBlockTriggered;
       // Wire up full lockdown callbacks
@@ -54,6 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
     AgentBridge.onLimitWarning = null;
     AgentBridge.onTamperDetected = null;
     AgentBridge.onVpnDetected = null;
+    AgentBridge.onPackageInstalled = null;
     if (Platform.isWindows) {
       AgentBridge.onBlockTriggered = null;
       final service = AgentBridge.windowsBridge?.service;
@@ -185,6 +188,39 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  void _handlePackageInstalled(String packageName) {
+    if (_installDialogShown || !mounted) return;
+    _installDialogShown = true;
+    // Show short app name (last segment of package name)
+    final appLabel = packageName.split('.').last;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.install_mobile, color: Color(0xFFF59E0B), size: 40),
+        title: const Text(
+          'Neue App installiert',
+          textAlign: TextAlign.center,
+        ),
+        content: Text(
+          'Die App "$appLabel" wurde installiert und ist gesperrt,\n'
+          'bis deine Eltern sie freigeben.',
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          OutlinedButton(
+            onPressed: () {
+              _installDialogShown = false;
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    ).then((_) => _installDialogShown = false);
   }
 
   void _handleFullLockdown(int durationSeconds) {

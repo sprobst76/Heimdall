@@ -173,6 +173,21 @@ class MethodChannelHandler(
                 channel.invokeMethod("onVpnDetected", mapOf("reason" to reason))
             }
         }
+
+        monitor.onPackageInstalled = { packageName ->
+            scope.launch(Dispatchers.IO) {
+                try {
+                    communication?.sendTamperAlert("package_installed:$packageName")
+                    Log.w(TAG, "New install alert sent: $packageName")
+                } catch (e: Exception) {
+                    Log.w(TAG, "New install alert failed: ${e.message}")
+                }
+            }
+            scope.launch(Dispatchers.Main) {
+                channel.invokeMethod("onPackageInstalled", mapOf("packageName" to packageName))
+                Log.i(TAG, "New install event sent to Flutter: $packageName")
+            }
+        }
     }
 
     /** Send all queued offline events to the backend. */
@@ -412,6 +427,12 @@ class MethodChannelHandler(
                     ))
                     Log.i(TAG, "TOTP offline validation: valid=$valid")
                 }
+            }
+            // Parent approved a newly installed app → remove from pending-block list
+            "approvePackage" -> {
+                val packageName = call.argument<String>("packageName") ?: ""
+                AppMonitorService.instance?.approvePackage(packageName)
+                result.success(true)
             }
             // Connect (or reconnect) WebSocket explicitly from Flutter
             "connectWebSocket" -> {
