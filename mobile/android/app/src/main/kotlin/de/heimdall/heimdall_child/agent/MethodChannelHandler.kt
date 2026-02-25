@@ -218,11 +218,14 @@ class MethodChannelHandler(
                 if (communication?.isRegistered == true) {
                     communication?.connectWebSocket()
                 }
+                // Schedule periodic rule sync (2h ±1h, network required)
+                WorkManagerScheduler.scheduleRuleSync(context)
                 result.success(true)
             }
             "stopMonitoring" -> {
                 val intent = Intent(context, AppMonitorService::class.java)
                 context.stopService(intent)
+                WorkManagerScheduler.cancelRuleSync(context)
                 result.success(true)
             }
             "checkPermissions" -> {
@@ -450,12 +453,7 @@ class MethodChannelHandler(
      */
     private fun isSafeMode(): Boolean {
         return try {
-            val safeMode = Settings.Global.getInt(
-                context.contentResolver,
-                Settings.Global.SAFE_BOOT_PERMITTED,
-                0
-            )
-            safeMode != 0
+            context.packageManager.isSafeMode
         } catch (e: Exception) {
             false
         }

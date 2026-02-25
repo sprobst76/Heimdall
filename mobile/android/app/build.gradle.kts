@@ -45,6 +45,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-service:2.8.7")
     // SharedPreferences (for offline rule cache)
     implementation("androidx.preference:preference-ktx:1.2.1")
+    // WorkManager for periodic background sync (rule refresh)
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
